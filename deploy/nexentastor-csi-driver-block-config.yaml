@@ -1,0 +1,22 @@
+# nexentastor-csi-driver config file to create k8s secret
+#
+# $ kubectl create secret generic nexentastor-csi-driver-config-driver \
+#   --from-file=deploy/kubernetes/nexentastor-csi-driver-config-driver.yaml
+#
+
+nexentastor_map:
+  nstor-box1:
+    restIp: https://10.3.199.252:8443,https://10.3.199.253:8443 # [required] NexentaStor REST API endpoint(s)
+    username: admin                                             # [required] NexentaStor REST API username
+    password: Nexenta@1                                         # [required] NexentaStor REST API password
+    defaultVolumeGroup: csiDriverPool/csiVolumeGroup            # default volume group for driver's volumes [pool/volumeGroup]
+    defaultDataIp: 10.3.199.245                                 # default NexentaStor data IP or HA VIP
+
+  nstor-box2:
+    restIp: https://10.3.199.252:8443,https://10.3.199.253:8443 # [required] NexentaStor REST API endpoint(s)
+    username: admin                                             # [required] NexentaStor REST API username
+    password: Nexenta@1                                         # [required] NexentaStor REST API password
+    defaultVolumeGroup: csiDriverPool/csiVolumeGroup            # default volume group for driver's volumes [pool/volumeGroup]
+    defaultDataIp: 10.3.199.245                                 # default NexentaStor data IP or HA VIP
+
+debug: false                                                # more logs
