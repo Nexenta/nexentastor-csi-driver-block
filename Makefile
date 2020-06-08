@@ -187,7 +187,7 @@ release:
 	docker login
 	make generate-changelog
 	make container-build
-	make container-push-remote
+# 	make container-push-remote
 	git add CHANGELOG.md
 	git commit -m "release v${VERSION}"
 	git push origin ${VERSION}
