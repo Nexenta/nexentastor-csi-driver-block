@@ -1,0 +1,22 @@
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-dynamic-volume
+spec:
+  containers:
+    - image: nginx
+      imagePullPolicy: IfNotPresent
+      name: nginx
+      ports:
+        - containerPort: 80
+          protocol: TCP
+      volumeDevices:
+        - devicePath: /dev/sdd
+          name: nexentastor-block-csi-driver-data
+  volumes:
+    - name: nexentastor-block-csi-driver-data
+      persistentVolumeClaim:
+        claimName: nexentastor-block-csi-driver-pvc-nginx-dynamic
+        readOnly: false
+---

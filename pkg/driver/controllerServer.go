@@ -4,10 +4,8 @@ import (
     "fmt"
     "path/filepath"
     "strings"
-    // "strconv"
 
     "github.com/container-storage-interface/spec/lib/go/csi"
-    // timestamp "github.com/golang/protobuf/ptypes/timestamp"
     "github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
     "github.com/sirupsen/logrus"
     "golang.org/x/net/context"
@@ -269,11 +267,12 @@ func (s *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *
 
 func validateVolumeCapability(requestedVolumeCapability *csi.VolumeCapability) bool {
     // block is not supported
-    if requestedVolumeCapability.GetBlock() != nil {
+    if requestedVolumeCapability.GetBlock() == nil {
         return false
     }
 
     requestedMode := requestedVolumeCapability.GetAccessMode().GetMode()
+
     for _, volumeCapability := range supportedVolumeCapabilities {
         if volumeCapability.GetAccessMode().GetMode() == requestedMode {
             return true
@@ -381,8 +380,6 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
     if reqParams == nil {
         reqParams = make(map[string]string)
     }
-
-    // get dataset path from runtime params, set default if not specified
     volumeGroup := ""
     if v, ok := reqParams["volumeGroup"]; ok {
         volumeGroup = v
@@ -391,6 +388,7 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
     if v, ok := reqParams["configName"]; ok {
         configName = v
     }
+
     requirements := req.GetAccessibilityRequirements()
     zone := s.pickAvailabilityZone(requirements)
     params := ResolveNSParams{
@@ -412,13 +410,51 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
     if err != nil {
         return nil, err
     }
+    cfg := s.config.NsMap[resolveResp.configName]
+    // get values from req params or set defaults
+    dataIP := ""
+    if v, ok := reqParams["dataIP"]; ok {
+        dataIP = v
+    } else {
+        dataIP = cfg.DefaultDataIP
+    }
+    target := ""
+    if v, ok := reqParams["target"]; ok {
+        target = v
+    } else {
+        target = cfg.DefaultTarget
+    }
+    hostGroup := ""
+    if v, ok := reqParams["hostGroup"]; ok {
+        hostGroup = v
+    } else {
+        hostGroup = cfg.DefaultHostGroup
+    }
+    iSCSIPort := ""
+    if v, ok := reqParams["iSCSIPort"]; ok {
+        iSCSIPort = v
+    } else {
+        iSCSIPort = cfg.DefaultISCSIPort
+    }
+    targetGroup := ""
+    if v, ok := reqParams["targetGroup"]; ok {
+        targetGroup = v
+    } else {
+        targetGroup = cfg.DefaultTargetGroup
+    }
+    
     res = &csi.CreateVolumeResponse{
         Volume: &csi.Volume{
             // ContentSource: contentSource,
             VolumeId:      fmt.Sprintf("%s:%s", resolveResp.configName, volumePath),
             CapacityBytes: capacityBytes,
             VolumeContext: map[string]string{
-                "dataIp":       reqParams["dataIp"],
+                "DataIP": dataIP,
+                "VolumeGroup": volumeGroup,
+                "Target": target,
+                "TargetGroup": targetGroup,
+                "HostGroup": hostGroup,
+                "iSCSIPort": iSCSIPort,
             },
         },
     }
@@ -447,24 +483,6 @@ func (s *ControllerServer) createNewVolume(
 
     if err != nil {
         if ns.IsAlreadyExistNefError(err) {
-            // existingFilesystem, err := nsProvider.GetFilesystem(volumePath)
-            // if err != nil {
-            //     return status.Errorf(
-            //         codes.Internal,
-            //         "Volume '%s' already exists, but volume properties request failed: %s",
-            //         volumePath,
-            //         err,
-            //     )
-            // } else if capacityBytes != 0 && existingFilesystem.GetReferencedQuotaSize() != capacityBytes {
-            //     return status.Errorf(
-            //         codes.AlreadyExists,
-            //         "Volume '%s' already exists, but with a different size: requested=%d, existing=%d",
-            //         volumePath,
-            //         capacityBytes,
-            //         existingFilesystem.GetReferencedQuotaSize(),
-            //     )
-            // }
-
             l.Infof("volume '%s' already exists and can be used", volumePath)
             return nil
         }
@@ -511,11 +529,11 @@ func (s *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
     configName, volumePath := splittedVol[0], splittedVol[1]
 
     splittedPath := strings.Split(volumePath, "/")
-    if len(splittedPath) != 2 {
+    if len(splittedPath) != 3 {
         l.Infof("Got wrong volumeId, but that is OK for deletion")
         return &csi.DeleteVolumeResponse{}, nil
     }
-    volumeGroup := splittedPath[0]
+    volumeGroup := strings.Join(splittedPath[:2], "/")
 
     params := ResolveNSParams{
         volumeGroup: volumeGroup,

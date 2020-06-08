@@ -10,8 +10,6 @@ import (
     "time"
 
     "gopkg.in/yaml.v2"
-
-    // "github.com/Nexenta/nexentastor-csi-driver-block/pkg/arrays"
 )
 
 // NexentaStor address format
@@ -31,7 +29,11 @@ type NsData struct {
     Username            string `yaml:"username"`
     Password            string `yaml:"password"`
     Zone                string `yaml: "zone"`
-    DefaultVolumeGroup      string `yaml:"defaultDataset,omitempty"`
+    DefaultVolumeGroup  string `yaml:"defaultVolumeGroup,omitempty"`
+    DefaultTargetGroup  string `yaml:"defaultTargetGroup,omitempty"`
+    DefaultTarget       string `yaml:"defaultTarget,omitempty"`
+    DefaultHostGroup    string `yaml:"defaultHostGroup,omitempty"`
+    DefaultISCSIPort    string `yaml:"defaultiSCSIPort,omitempty"`
     DefaultDataIP       string `yaml:"defaultDataIp,omitempty"`
 }
 

@@ -1,0 +1,69 @@
+# Nginx pod with dynamic storage creation using NexentaStor Block CSI driver
+#
+# $ kubectl apply -f examples/kubernetes/nginx-dynamic-volume.yaml
+#
+# --------------------------------------
+# NexentaStor CSI Driver - Storage Class
+# --------------------------------------
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nexentastor-block-csi-driver-sc-nginx-dynamic
+provisioner: nexentastor-block-csi-driver.nexenta.com
+mountOptions:                        # list of options for `mount -o ...` command
+#  - noatime                         #
+allowVolumeExpansion: true
+# volumeBindingMode: Immediate
+# allowedTopologies:
+# - matchLabelExpressions:
+#   - key: topology.kubernetes.io/zone
+#     values:
+#     - zone-1
+# parameters:
+#   configName: nstor-box3
+  #dataset: customPool/customDataset # to overwrite "defaultDataset" config property [pool/dataset]
+  #dataIp: 20.20.20.253              # to overwrite "defaultDataIp" config property
+---
+
+# ------------------------------------------------
+# NexentaStor CSI Driver - Persistent Volume Claim
+# ------------------------------------------------
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nexentastor-block-csi-driver-pvc-nginx-dynamic
+spec:
+  storageClassName: nexentastor-block-csi-driver-sc-nginx-dynamic
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Block
+  resources:
+    requests:
+      storage: 3Gi
+---
+# ---------
+# Nginx pod
+# ---------
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-dynamic-volume
+spec:
+  containers:
+    - image: nginx
+      imagePullPolicy: IfNotPresent
+      name: nginx
+      ports:
+        - containerPort: 80
+          protocol: TCP
+      volumeDevices:
+        - devicePath: /dev/sdc
+          name: nexentastor-block-csi-driver-data
+  volumes:
+    - name: nexentastor-block-csi-driver-data
+      persistentVolumeClaim:
+        claimName: nexentastor-block-csi-driver-pvc-nginx-dynamic
+        readOnly: false

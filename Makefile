@@ -5,7 +5,7 @@
 # - TEST_K8S_IP=10.3.199.250 # e2e k8s tests
 #
 
-DRIVER_NAME = nexentastor-csi-driver-block-block
+DRIVER_NAME = nexentastor-csi-driver-block
 IMAGE_NAME ?= ${DRIVER_NAME}
 
 DOCKER_FILE = Dockerfile

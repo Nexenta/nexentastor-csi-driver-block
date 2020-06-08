@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ME=`basename "$0"`
-#echo "I am ${ME}"
+echo "I am ${ME}"
 
 DIR="/host"
 if [ ! -d "${DIR}" ]; then

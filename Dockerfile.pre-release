@@ -1,0 +1,21 @@
+# pre-release container generates:
+# - CNAHGELOG.md
+
+FROM golang:1.13
+
+WORKDIR /go/src/github.com/Nexenta/nexentastor-csi-driver-block/
+
+# deps
+RUN go get github.com/git-chglog/git-chglog/cmd/git-chglog
+
+# source code
+COPY . ./
+
+# next release tag
+ARG VERSION
+ENV VERSION=$VERSION
+
+# generate changelog
+RUN echo "Use version: $VERSION" && /go/bin/git-chglog --next-tag v${VERSION} -o CHANGELOG.md
+
+ENTRYPOINT ["/bin/bash"]
