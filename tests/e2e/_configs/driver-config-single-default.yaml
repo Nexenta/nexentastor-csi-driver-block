@@ -1,0 +1,11 @@
+nexentastor_map:
+    nstor-box1:
+      restIp: https://10.3.199.189:8443
+      username: admin
+      password: Nexenta@1
+      defaultDataIp: 10.3.199.189
+      defaultVolumeGroup: tank01/csiVolumeGroup
+      defaultTargetGroup: tg01
+      defaultTarget: iqn.2005-07.com.nexenta:01:test
+      defaultHostGroup: all
+debug: false

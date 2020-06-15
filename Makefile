@@ -88,16 +88,11 @@ test-unit-container:
 .PHONY: test-e2e-k8s-local-image
 test-e2e-k8s-local-image: check-env-TEST_K8S_IP
 	sed -e "s/image: nexenta/image: ${REGISTRY_LOCAL}/g" \
-		./deploy/nexentastor-csi-driver-block.yaml > /tmp/nexentastor-csi-driver-block-local.yaml
+		./deploy/kubernetes/nexentastor-csi-driver-block.yaml > /tmp/nexentastor-csi-driver-block-local.yaml
 	go test -timeout 20m tests/e2e/driver_test.go -v -count 1 \
 		--k8sConnectionString="root@${TEST_K8S_IP}" \
 		--k8sDeploymentFile="/tmp/nexentastor-csi-driver-block-local.yaml" \
-		--k8sSecretFile="./_configs/driver-config-single-default.yaml" \
-		--fsTypeFlag="nfs"
-	go test -timeout 20m tests/e2e/driver_test.go -v -count 1 \
-		--k8sConnectionString="root@${TEST_K8S_IP}" \
-		--k8sDeploymentFile="/tmp/nexentastor-csi-driver-block-local.yaml" \
-		--k8sSecretFile="./_configs/driver-config-single-cifs.yaml"
+		--k8sSecretFile="./_configs/driver-config-single-default.yaml"
 .PHONY: test-e2e-k8s-local-image-container
 test-e2e-k8s-local-image-container: check-env-TEST_K8S_IP
 	docker build -f ${DOCKER_FILE_TESTS} -t ${IMAGE_NAME}-test --build-arg VERSION=${VERSION} \
@@ -113,13 +108,8 @@ test-e2e-k8s-local-image-container: check-env-TEST_K8S_IP
 test-e2e-k8s-remote-image: check-env-TEST_K8S_IP
 	go test -timeout 20m tests/e2e/driver_test.go -v -count 1 \
 		--k8sConnectionString="root@${TEST_K8S_IP}" \
-		--k8sDeploymentFile="../../deploy/nexentastor-csi-driver-block.yaml" \
-		--k8sSecretFile="./_configs/driver-config-single-default.yaml" \
-		--fsTypeFlag="nfs"
-	go test -timeout 20m tests/e2e/driver_test.go -v -count 1 \
-		--k8sConnectionString="root@${TEST_K8S_IP}" \
-		--k8sDeploymentFile="../../deploy/nexentastor-csi-driver-block.yaml" \
-		--k8sSecretFile="./_configs/driver-config-single-cifs.yaml"
+		--k8sDeploymentFile="../../deploy/kubernetes/nexentastor-csi-driver-block.yaml" \
+		--k8sSecretFile="./_configs/driver-config-single-default.yaml"
 .PHONY: test-e2e-k8s-local-image-container
 test-e2e-k8s-remote-image-container: check-env-TEST_K8S_IP
 	docker build -f ${DOCKER_FILE_TESTS} -t ${IMAGE_NAME}-test --build-arg VERSION=${VERSION} \
