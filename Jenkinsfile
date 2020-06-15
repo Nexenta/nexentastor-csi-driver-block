@@ -42,7 +42,7 @@ pipeline {
         }
         stage('Tests [local registry]') {
             steps {
-                sh "TEST_K8S_IP=${params.TEST_K8S_IP} make test-e2e-k8s-local-image-container"
+                sh "TEST_K8S_IP=${params.TEST_K8S_IP} TESTRAIL_URL=${TESTRAIL_URL} TESTRAIL_USR=${TESTRAIL_USR} TESTRAIL_PSWD=${TESTRAIL_PSW} make test-e2e-k8s-local-image-container"
             }
         }
     }
