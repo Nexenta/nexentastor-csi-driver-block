@@ -8,7 +8,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/Nexenta/nexentastor-csi-driver/tests/utils/remote"
+	"github.com/Nexenta/nexentastor-csi-driver-block/tests/utils/remote"
 )
 
 const (
