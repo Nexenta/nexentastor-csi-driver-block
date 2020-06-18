@@ -223,26 +223,26 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy
-        # - name: csi-snapshotter
-        #   image: quay.io/k8scsi/csi-snapshotter:v1.1.0 # v1.2.0 doesn't work
-        #   imagePullPolicy: IfNotPresent
-        #   args:
-        #     - --connection-timeout=25s
-        #     - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
-        #   volumeMounts:
-        #     - name: socket-dir
-        #       mountPath: /var/lib/csi/sockets/pluginproxy
-        # - name: csi-resizer
-        #   image: quay.io/k8scsi/csi-resizer:v0.4.0
-        #   args:
-        #     - "--csi-address=$(ADDRESS)"
-        #   env:
-        #     - name: ADDRESS
-        #       value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        #   imagePullPolicy: "IfNotPresent"
-        #   volumeMounts:
-        #     - name: socket-dir
-        #       mountPath: /var/lib/csi/sockets/pluginproxy/
+        - name: csi-snapshotter
+          image: quay.io/k8scsi/csi-snapshotter:v1.1.0 # v1.2.0 doesn't work
+          imagePullPolicy: IfNotPresent
+          args:
+            - --connection-timeout=25s
+            - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy
+        - name: csi-resizer
+          image: quay.io/k8scsi/csi-resizer:v0.4.0
+          args:
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: driver
           image: 10.3.199.92:5000/nexentastor-csi-driver-block:master
           imagePullPolicy: Always

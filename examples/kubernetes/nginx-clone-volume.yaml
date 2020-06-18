@@ -1,0 +1,46 @@
+# ------------------------------------------------------------------------------------------
+# NexentaStor CSI Driver - Persistent Volume Claim cloned from another PVC
+# ------------------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nexentastor-block-csi-driver-pvc-nginx-dynamic-clone
+spec:
+  storageClassName: nexentastor-block-csi-driver-sc-nginx-dynamic
+  dataSource:
+    kind: PersistentVolumeClaim
+    apiGroup: ""
+    name: nexentastor-block-csi-driver-pvc-nginx-dynamic # pvc name
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Block
+  resources:
+    requests:
+      storage: 1Gi
+---
+
+# ---------
+# Nginx pod
+# ---------
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-dynamic-volume-clone
+spec:
+  containers:
+    - image: nginx
+      imagePullPolicy: IfNotPresent
+      name: nginx
+      ports:
+        - containerPort: 80
+          protocol: TCP
+      volumeDevices:
+        - devicePath: /dev/sdd
+          name: nexentastor-block-csi-driver-data-clone
+  volumes:
+    - name: nexentastor-block-csi-driver-data-clone
+      persistentVolumeClaim:
+        claimName: nexentastor-block-csi-driver-pvc-nginx-dynamic-clone
+        readOnly: false

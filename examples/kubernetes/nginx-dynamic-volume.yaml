@@ -41,7 +41,7 @@ spec:
   volumeMode: Block
   resources:
     requests:
-      storage: 3Gi
+      storage: 2Gi
 ---
 # ---------
 # Nginx pod

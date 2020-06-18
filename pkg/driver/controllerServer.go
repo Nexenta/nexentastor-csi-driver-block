@@ -6,6 +6,7 @@ import (
     "strings"
 
     "github.com/container-storage-interface/spec/lib/go/csi"
+    timestamp "github.com/golang/protobuf/ptypes/timestamp"
     "github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
     "github.com/sirupsen/logrus"
     "golang.org/x/net/context"
@@ -22,11 +23,11 @@ const TopologyKeyZone = "topology.kubernetes.io/zone"
 var supportedControllerCapabilities = []csi.ControllerServiceCapability_RPC_Type{
     csi.ControllerServiceCapability_RPC_LIST_VOLUMES,
     csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
-    // csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
-    // csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
-    // csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
+    csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,
+    csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
+    csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
     csi.ControllerServiceCapability_RPC_GET_CAPACITY,
-    // csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
+    csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 }
 
 // supportedVolumeCapabilities - driver volume capabilities
@@ -281,6 +282,66 @@ func validateVolumeCapability(requestedVolumeCapability *csi.VolumeCapability) b
     return false
 }
 
+func (s *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (
+    *csi.ControllerExpandVolumeResponse,
+    error,
+) {
+    l := s.log.WithField("func", "ControllerExpandVolume()")
+    l.Infof("request: '%+v'", protosanitizer.StripSecrets(req))
+
+    var secret string
+    secrets := req.GetSecrets()
+    for _, v := range secrets {
+        secret = v
+    }
+    err := s.refreshConfig(secret)
+    if err != nil {
+        return nil, status.Errorf(codes.FailedPrecondition, "Cannot use config file: %s", err)
+    }
+    capacityBytes := req.GetCapacityRange().GetRequiredBytes()
+    if capacityBytes == 0 {
+        return nil, status.Error(codes.InvalidArgument, "GetRequiredBytes must be >0")
+    }
+
+    volumeId := req.GetVolumeId()
+    if len(volumeId) == 0 {
+        return nil, status.Error(codes.InvalidArgument, "Volume ID must be provided")
+    }
+    splittedVol := strings.Split(volumeId, ":")
+    if len(splittedVol) != 2 {
+        return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("VolumeId is in wrong format: %s", volumeId))
+    }
+    configName, volumePath := splittedVol[0], splittedVol[1]
+
+    splittedPath := strings.Split(volumePath, "/")
+    if len(splittedPath) != 3 {
+        l.Infof("Got wrong volumeId, but that is OK for deletion")
+        return &csi.ControllerExpandVolumeResponse{}, nil
+    }
+    volumeGroup := strings.Join(splittedPath[:2], "/")
+
+    params := ResolveNSParams{
+        volumeGroup: volumeGroup,
+        configName: configName,
+    }
+    resolveResp, err := s.resolveNS(params)
+    if err != nil {
+        return nil, err
+    }
+    nsProvider := resolveResp.nsProvider
+
+    l.Infof("expanding volume %+v to %+v bytes", volumePath, capacityBytes)
+    err = nsProvider.UpdateVolume(volumePath, ns.UpdateVolumeParams{
+        VolumeSize: capacityBytes,
+    })
+    if err != nil {
+        return nil, fmt.Errorf("Failed to expand volume volume %s: %s", volumePath, err)
+    }
+    return &csi.ControllerExpandVolumeResponse{
+        CapacityBytes: capacityBytes,
+    }, nil
+}
+
 func (s *ControllerServer) pickAvailabilityZone(requirement *csi.TopologyRequirement) string {
     l := s.log.WithField("func", "s.pickAvailabilityZone()")
     l.Infof("AccessibilityRequirements: '%+v'", requirement)
@@ -389,6 +450,29 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
         configName = v
     }
 
+    var sourceSnapshotId string
+    var sourceVolumeId string
+    var volumePath string
+    var contentSource *csi.VolumeContentSource
+    var nsProvider ns.ProviderInterface
+    var resolveResp ResolveNSResponse
+
+    if volumeContentSource := req.GetVolumeContentSource(); volumeContentSource != nil {
+        if sourceSnapshot := volumeContentSource.GetSnapshot(); sourceSnapshot != nil {
+            sourceSnapshotId = sourceSnapshot.GetSnapshotId()
+            contentSource = req.GetVolumeContentSource()
+        } else if sourceVolume := volumeContentSource.GetVolume(); sourceVolume != nil {
+            sourceVolumeId = sourceVolume.GetVolumeId()
+            contentSource = req.GetVolumeContentSource()
+        } else {
+            return nil, status.Errorf(
+                codes.InvalidArgument,
+                "Only snapshots and volumes are supported as volume content source, but got type: %s",
+                volumeContentSource.GetType(),
+            )
+        }
+    }
+
     requirements := req.GetAccessibilityRequirements()
     zone := s.pickAvailabilityZone(requirements)
     params := ResolveNSParams{
@@ -399,17 +483,53 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
     // get requested volume size from runtime params, set default if not specified
     capacityBytes := req.GetCapacityRange().GetRequiredBytes()
-    resolveResp, err := s.resolveNS(params)
+    if sourceSnapshotId != "" {
+        // create new volume using existing snapshot
+        splittedSnap := strings.Split(sourceSnapshotId, ":")
+        if len(splittedSnap) != 2 {
+            return nil, status.Error(codes.NotFound, fmt.Sprintf("SnapshotId is in wrong format: %s", sourceSnapshotId))
+        }
+        configName, sourceSnapshot := splittedSnap[0], splittedSnap[1]
+        params.configName = configName
+        resolveResp, err = s.resolveNS(params)
+        if err != nil {
+            return nil, err
+        }
+        nsProvider = resolveResp.nsProvider
+        volumeGroup = resolveResp.volumeGroup
+        volumePath = filepath.Join(volumeGroup, volumeName)
+        err = s.createNewVolumeFromSnapshot(nsProvider, sourceSnapshot, volumePath, capacityBytes)
+    } else if sourceVolumeId != "" {
+        // clone existing volume
+        splittedVol := strings.Split(sourceVolumeId, ":")
+        if len(splittedVol) != 2 {
+            return nil, status.Error(codes.NotFound, fmt.Sprintf("VolumeId is in wrong format: %s", sourceVolumeId))
+        }
+        configName, sourceVolume := splittedVol[0], splittedVol[1]
+        params.configName = configName
+        resolveResp, err = s.resolveNS(params)
+        if err != nil {
+            return nil, err
+        }
+        nsProvider = resolveResp.nsProvider
+        volumeGroup = resolveResp.volumeGroup
+        volumePath = filepath.Join(volumeGroup, volumeName)
+        err = s.createClonedVolume(nsProvider, sourceVolume, volumePath, volumeName, capacityBytes)
+    } else {
+        resolveResp, err = s.resolveNS(params)
+        if err != nil {
+            return nil, err
+        }
+        nsProvider = resolveResp.nsProvider
+        volumeGroup = resolveResp.volumeGroup
+        volumePath = filepath.Join(volumeGroup, volumeName)
+        err = s.createNewVolume(nsProvider, volumePath, capacityBytes)
+    }
+
     if err != nil {
         return nil, err
     }
-    nsProvider := resolveResp.nsProvider
-    volumeGroup = resolveResp.volumeGroup
-    volumePath := filepath.Join(volumeGroup, volumeName)
-    err = s.createNewVolume(nsProvider, volumePath, capacityBytes)
-    if err != nil {
-        return nil, err
-    }
+
     cfg := s.config.NsMap[resolveResp.configName]
     // get values from req params or set defaults
     dataIP := ""
@@ -445,7 +565,7 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
     
     res = &csi.CreateVolumeResponse{
         Volume: &csi.Volume{
-            // ContentSource: contentSource,
+            ContentSource: contentSource,
             VolumeId:      fmt.Sprintf("%s:%s", resolveResp.configName, volumePath),
             CapacityBytes: capacityBytes,
             VolumeContext: map[string]string{
@@ -496,6 +616,90 @@ func (s *ControllerServer) createNewVolume(
     }
 
     l.Infof("volume '%s' has been created", volumePath)
+    return nil
+}
+
+// create new volume using existing snapshot
+func (s *ControllerServer) createNewVolumeFromSnapshot(
+    nsProvider ns.ProviderInterface,
+    sourceSnapshotID string,
+    volumePath string,
+    capacityBytes int64,
+) (error) {
+    l := s.log.WithField("func", "createNewVolumeFromSnapshot()")
+    l.Infof("snapshot: %s", sourceSnapshotID)
+
+    snapshot, err := nsProvider.GetSnapshot(sourceSnapshotID)
+    if err != nil {
+        message := fmt.Sprintf("Failed to find snapshot '%s': %s", sourceSnapshotID, err)
+        if ns.IsNotExistNefError(err) || ns.IsBadArgNefError(err) {
+            return status.Error(codes.NotFound, message)
+        }
+        return status.Error(codes.NotFound, message)
+    }
+
+    err = nsProvider.CloneSnapshot(snapshot.Path, ns.CloneSnapshotParams{
+        TargetPath: volumePath,
+        ReferencedQuotaSize: capacityBytes,
+    })
+    if err != nil {
+        if ns.IsAlreadyExistNefError(err) {
+            l.Infof("volume '%s' already exists and can be used", volumePath)
+            return nil
+        }
+
+        return status.Errorf(
+            codes.Internal,
+            "Cannot create volume '%s' using snapshot '%s': %s",
+            volumePath,
+            snapshot.Path,
+            err,
+        )
+    }
+
+    l.Infof("volume '%s' has been created using snapshot '%s'", volumePath, snapshot.Path)
+    return nil
+}
+
+func (s *ControllerServer) createClonedVolume(
+    nsProvider ns.ProviderInterface,
+    sourceVolumeID string,
+    volumePath string,
+    volumeName string,
+    capacityBytes int64,
+) (error) {
+
+    l := s.log.WithField("func", "createClonedVolume()")
+    l.Infof("clone volume source: %+v, target: %+v", sourceVolumeID, volumePath)
+
+    snapName := fmt.Sprintf("k8s-clone-snapshot-%s", volumeName)
+    snapshotPath := fmt.Sprintf("%s@%s", sourceVolumeID, snapName)
+
+    _, err := s.CreateSnapshotOnNS(nsProvider, sourceVolumeID, snapName)
+    if err != nil {
+        return err
+    }
+
+    err = nsProvider.CloneSnapshot(snapshotPath, ns.CloneSnapshotParams{
+        TargetPath: volumePath,
+    })
+
+    if err != nil {
+        if ns.IsAlreadyExistNefError(err) {
+            l.Infof("volume '%s' already exists and can be used", volumePath)
+            return nil
+        }
+
+        return status.Errorf(
+            codes.NotFound,
+            "Cannot create volume '%s' using snapshot '%s': %s",
+            volumePath,
+            snapshotPath,
+            err,
+        )
+    }
+
+    l.Infof("successfully created cloned volume %+v", volumePath)
     return nil
 }
 
@@ -572,8 +776,117 @@ func (s *ControllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSn
     *csi.CreateSnapshotResponse,
     error,
 ) {
-    s.log.WithField("func", "CreateSnapshot()").Warnf("request: '%+v' - not implemented", req)
-    return nil, status.Error(codes.Unimplemented, "")
+    l := s.log.WithField("func", "CreateSnapshot()")
+    l.Infof("request: '%+v'", protosanitizer.StripSecrets(req))
+
+    err := s.refreshConfig("")
+    if err != nil {
+        return nil, status.Errorf(codes.FailedPrecondition, "Cannot use config file: %s", err)
+    }
+
+    sourceVolumeId := req.GetSourceVolumeId()
+    if len(sourceVolumeId) == 0 {
+        return nil, status.Error(codes.InvalidArgument, "Snapshot source volume ID must be provided")
+    }
+    splittedVol := strings.Split(sourceVolumeId, ":")
+    if len(splittedVol) != 2 {
+        return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("VolumeId is in wrong format: %s", sourceVolumeId))
+    }
+    configName, volumePath := splittedVol[0], splittedVol[1]
+
+    name := req.GetName()
+    if len(name) == 0 {
+        return nil, status.Error(codes.InvalidArgument, "Snapshot name must be provided")
+    }
+
+    splittedPath := strings.Split(volumePath, "/")
+    if len(splittedPath) != 3 {
+        return nil, status.Errorf(codes.InvalidArgument, "Got wrong volumeId: %s", sourceVolumeId)
+    }
+    volumeGroup := strings.Join(splittedPath[:2], "/")
+
+    params := ResolveNSParams{
+        volumeGroup: volumeGroup,
+        configName:  configName,
+    }
+    resolveResp, err := s.resolveNS(params)
+    if err != nil {
+        return nil, err
+    }
+
+    snapshotPath := fmt.Sprintf("%s@%s", volumePath, name)
+    createdSnapshot, err := s.CreateSnapshotOnNS(resolveResp.nsProvider, volumePath, name)
+    if err != nil {
+        return nil, err
+    }
+    creationTime := &timestamp.Timestamp{
+        Seconds: createdSnapshot.CreationTime.Unix(),
+    }
+
+    snapshotId := fmt.Sprintf("%s:%s", configName, snapshotPath)
+    res := &csi.CreateSnapshotResponse{
+        Snapshot: &csi.Snapshot{
+            SnapshotId:     snapshotId,
+            SourceVolumeId: sourceVolumeId,
+            CreationTime:   creationTime,
+            ReadyToUse:     true,
+        },
+    }
+
+    if ns.IsAlreadyExistNefError(err) {
+        l.Infof("snapshot '%s' already exists and can be used", snapshotId)
+        return res, nil
+    }
+
+    l.Infof("snapshot '%s' has been created", snapshotId)
+    return res, nil
+}
+
+func (s *ControllerServer) CreateSnapshotOnNS(nsProvider ns.ProviderInterface, volumePath, snapName string) (
+    snapshot ns.Snapshot, err error) {
+
+    l := s.log.WithField("func", "CreateSnapshotOnNS()")
+    l.Infof("creating snapshot %+v@%+v", volumePath, snapName)
+
+    //K8s doesn't allow to have same named snapshots for different volumes
+    sourcePath := filepath.Dir(volumePath)
+
+    existingSnapshots, err := nsProvider.GetSnapshots(sourcePath, true)
+    if err != nil {
+        return snapshot, status.Errorf(codes.NotFound, "Cannot get snapshots list: %s", err)
+    }
+    for _, s := range existingSnapshots {
+        if s.Name == snapName && s.Parent != volumePath {
+            return snapshot, status.Errorf(
+                codes.AlreadyExists,
+                "Snapshot '%s' already exists for filesystem: %s",
+                snapName,
+                s.Path,
+            )
+        }
+    }
+
+    snapshotPath := fmt.Sprintf("%s@%s", volumePath, snapName)
+
+    // if here, than volumePath exists on some NS
+    err = nsProvider.CreateSnapshot(ns.CreateSnapshotParams{
+        Path: snapshotPath,
+    })
+    if err != nil && !ns.IsAlreadyExistNefError(err) {
+        return snapshot, status.Errorf(codes.Internal, "Cannot create snapshot '%s': %s", snapshotPath, err)
+    }
+
+    snapshot, err = nsProvider.GetSnapshot(snapshotPath)
+    if err != nil {
+        return snapshot, status.Errorf(
+            codes.Internal,
+            "Snapshot '%s' has been created, but snapshot properties request failed: %s",
+            snapshotPath,
+            err,
+        )
+    }
+    l.Infof("successfully created snapshot %+v@%+v", volumePath, snapName)
+    return snapshot, nil
 }
 
 // DeleteSnapshot deletes snapshots
@@ -581,8 +894,69 @@ func (s *ControllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSn
     *csi.DeleteSnapshotResponse,
     error,
 ) {
-    s.log.WithField("func", "DeleteSnapshot()").Warnf("request: '%+v' - not implemented", req)
-    return nil, status.Error(codes.Unimplemented, "")
+    l := s.log.WithField("func", "DeleteSnapshot()")
+    l.Infof("request: '%+v'", protosanitizer.StripSecrets(req))
+
+    err := s.refreshConfig("")
+    if err != nil {
+        return nil, status.Errorf(codes.FailedPrecondition, "Cannot use config file: %s", err)
+    }
+
+    snapshotId := req.GetSnapshotId()
+    if len(snapshotId) == 0 {
+        return nil, status.Error(codes.InvalidArgument, "Snapshot ID must be provided")
+    }
+
+    volume := ""
+    snapshot := ""
+    splittedString := strings.Split(snapshotId, "@")
+    if len(splittedString) == 2 {
+        volume = splittedString[0]
+        snapshot = splittedString[1]
+    } else {
+        l.Infof("snapshot '%s' not found, that's OK for deletion request", snapshotId)
+        return &csi.DeleteSnapshotResponse{}, nil
+    }
+    splittedVol := strings.Split(volume, ":")
+    if len(splittedVol) != 2 {
+        return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("VolumeId is in wrong format: %s", volume))
+    }
+    configName, volumePath := splittedVol[0], splittedVol[1]
+
+    splittedPath := strings.Split(volumePath, "/")
+    if len(splittedPath) != 3 {
+        return nil, status.Errorf(codes.InvalidArgument, "Got wrong volume: %s", volume)
+    }
+    volumeGroup := strings.Join(splittedPath[:2], "/")
+    params := ResolveNSParams{
+        volumeGroup: volumeGroup,
+        configName:  configName,
+    }
+
+    resolveResp, err := s.resolveNS(params)
+    if err != nil {
+        if status.Code(err) == codes.NotFound {
+            l.Infof("snapshot '%s' not found, that's OK for deletion request", snapshotId)
+            return &csi.DeleteSnapshotResponse{}, nil
+        }
+        return nil, err
+    }
+    nsProvider := resolveResp.nsProvider
+
+    // if here, than snapshotPath exists on some NS
+    snapshotPath := strings.Join([]string{volumePath, snapshot}, "@")
+    l.Warnf(snapshotPath)
+    err = nsProvider.DestroySnapshot(snapshotPath)
+    if err != nil && !ns.IsNotExistNefError(err) {
+        message := fmt.Sprintf("Failed to delete snapshot '%s'", snapshotPath)
+        if ns.IsBusyNefError(err) {
+            message += ", it has dependent filesystem"
+        }
+        return nil, status.Errorf(codes.Internal, "%s: %s", message, err)
+    }
+
+    l.Infof("snapshot '%s' has been deleted", snapshotPath)
+    return &csi.DeleteSnapshotResponse{}, nil
 }
 
 // ListSnapshots returns the list of snapshots
@@ -590,8 +964,178 @@ func (s *ControllerServer) ListSnapshots(ctx context.Context, req *csi.ListSnaps
     *csi.ListSnapshotsResponse,
     error,
 ) {
-    s.log.WithField("func", "ListSnapshots()").Warnf("request: '%+v' - not implemented", req)
-    return nil, status.Error(codes.Unimplemented, "")
+    l := s.log.WithField("func", "ListSnapshots()")
+    l.Infof("request: '%+v'", protosanitizer.StripSecrets(req))
+
+    err := s.refreshConfig("")
+    if err != nil {
+        return nil, status.Errorf(codes.FailedPrecondition, "Cannot use config file: %s", err)
+    }
+
+    if req.GetSnapshotId() != "" {
+        return s.getSnapshotListWithSingleSnapshot(req.GetSnapshotId(), req)
+    } else if req.GetSourceVolumeId() != "" {
+        return s.getVolumeSnapshotList(req.GetSourceVolumeId(), req)
+    } else {
+        response := csi.ListSnapshotsResponse{
+            Entries: []*csi.ListSnapshotsResponse_Entry{},
+        }
+        for _, cfg := range s.config.NsMap {
+            resp, _ := s.getVolumeSnapshotList(cfg.DefaultVolumeGroup, req)
+            for _, snapshot := range resp.Entries {
+                response.Entries = append(response.Entries, snapshot)
+            }
+            if len(resp.NextToken) > 0 {
+                response.NextToken = resp.NextToken
+                return &response, nil
+            }
+        }
+        return &response, nil
+    }
+}
+
+func (s *ControllerServer) getSnapshotListWithSingleSnapshot(snapshotId string, req *csi.ListSnapshotsRequest) (
+    *csi.ListSnapshotsResponse,
+    error,
+) {
+    l := s.log.WithField("func", "getSnapshotListWithSingleSnapshot()")
+    l.Infof("Snapshot path: %s", snapshotId)
+
+    response := csi.ListSnapshotsResponse{
+        Entries: []*csi.ListSnapshotsResponse_Entry{},
+    }
+
+    splittedSnapshotPath := strings.Split(snapshotId, "@")
+    if len(splittedSnapshotPath) != 2 {
+        // bad snapshotID format, but it's ok, driver should return empty response
+        l.Infof("Bad snapshot format: %s", splittedSnapshotPath)
+        return &response, nil
+    }
+    splittedSnapshotId := strings.Split(splittedSnapshotPath[0], ":")
+    configName, volumePath := splittedSnapshotId[0], splittedSnapshotId[1]
+
+    splittedPath := strings.Split(volumePath, "/")
+    if len(splittedPath) != 3 {
+        return nil, status.Errorf(codes.InvalidArgument, "Got wrong volume: %s", volumePath)
+    }
+    volumeGroup := strings.Join(splittedPath[:2], "/")
+    params := ResolveNSParams{
+        volumeGroup: volumeGroup,
+        configName:  configName,
+    }
+
+    resolveResp, err := s.resolveNS(params)
+    if err != nil {
+        if status.Code(err) == codes.NotFound {
+            l.Infof("filesystem '%s' not found, that's OK for list request", volumePath)
+            return &response, nil
+        }
+        return nil, err
+    }
+    nsProvider := resolveResp.nsProvider
+    snapshotPath := fmt.Sprintf("%s@%s", volumePath, splittedSnapshotPath[1])
+    snapshot, err := nsProvider.GetSnapshot(snapshotPath)
+    if err != nil {
+        if ns.IsNotExistNefError(err) {
+            return &response, nil
+        }
+        return nil, status.Errorf(codes.Internal, "Cannot get snapshot '%s' for snapshot list: %s", snapshotPath, err)
+    }
+    response.Entries = append(response.Entries, convertNSSnapshotToCSISnapshot(snapshot, configName))
+    l.Infof("snapshot '%s' found for '%s' filesystem", snapshot.Path, volumePath)
+    return &response, nil
+}
+
+func (s *ControllerServer) getVolumeSnapshotList(volumeId string, req *csi.ListSnapshotsRequest) (
+    *csi.ListSnapshotsResponse,
+    error,
+) {
+    l := s.log.WithField("func", "getVolumeSnapshotList()")
+    l.Infof("volume path: %s", volumeId)
+
+    startingToken := req.GetStartingToken()
+    maxEntries := req.GetMaxEntries()
+
+    response := csi.ListSnapshotsResponse{
+        Entries: []*csi.ListSnapshotsResponse_Entry{},
+    }
+    splittedVol := strings.Split(volumeId, ":")
+    volumePath := ""
+    configName := ""
+    params := ResolveNSParams{}
+    if len(splittedVol) == 2 {
+        configName, volumePath = splittedVol[0], splittedVol[1]
+
+        splittedPath := strings.Split(volumePath, "/")
+        if len(splittedPath) != 3 {
+            return nil, status.Errorf(codes.InvalidArgument, "Got wrong volume: %s", volumePath)
+        }
+        volumeGroup := strings.Join(splittedPath[:2], "/")
+        params := ResolveNSParams{
+            volumeGroup: volumeGroup,
+            configName:  configName,
+        }
+        params.volumeGroup = volumeGroup
+        params.configName = configName
+    } else {
+        volumePath = volumeId
+        params.volumeGroup = volumePath
+    }
+    resolveResp, err := s.resolveNS(params)
+    if err != nil {
+        l.Infof("volume '%s' not found, that's OK for list request", volumePath)
+        return &response, nil
+    }
+
+    nsProvider := resolveResp.nsProvider
+    snapshots, err := nsProvider.GetSnapshots(volumePath, true)
+    if err != nil {
+        return nil, status.Errorf(codes.Internal, "Cannot get snapshot list for '%s': %s", volumePath, err)
+    }
+
+    for i, snapshot := range snapshots {
+        // skip all snapshots before startring token
+        if snapshot.Path == startingToken {
+            startingToken = ""
+        }
+        if startingToken != "" {
+            continue
+        }
+
+        response.Entries = append(response.Entries, convertNSSnapshotToCSISnapshot(snapshot, resolveResp.configName))
+
+        // if the requested maximum is reached (and specified) than set next token
+        if maxEntries != 0 && int32(len(response.Entries)) == maxEntries {
+            if i+1 < len(snapshots) { // next snapshots index exists
+                l.Infof(
+                    "max entries count (%d) has been reached while getting snapshots for '%s' filesystem, "+
+                        "send response with next_token for pagination",
+                    maxEntries,
+                    volumePath,
+                )
+                response.NextToken = snapshots[i+1].Path
+                return &response, nil
+            }
+        }
+    }
+
+    l.Infof("found %d snapshot(s) for %s filesystem", len(response.Entries), volumePath)
+
+    return &response, nil
+}
+
+func convertNSSnapshotToCSISnapshot(snapshot ns.Snapshot, configName string) *csi.ListSnapshotsResponse_Entry {
+    return &csi.ListSnapshotsResponse_Entry{
+        Snapshot: &csi.Snapshot{
+            SnapshotId:     fmt.Sprintf("%s:%s", configName, snapshot.Path),
+            SourceVolumeId: fmt.Sprintf("%s:%s", configName, snapshot.Parent),
+            CreationTime: &timestamp.Timestamp{
+                Seconds: snapshot.CreationTime.Unix(),
+            },
+            ReadyToUse: true, //TODO use actual state
+            //SizeByte: 0 //TODO size of zero means it is unspecified
+        },
+    }
 }
 
 // ListVolumes - list volumes, shows only volumes created in defaultDataset
@@ -618,15 +1162,6 @@ func (s *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
     error,
 ) {
     s.log.WithField("func", "ControllerUnpublishVolume()").Warnf("request: '%+v' - not implemented", req)
-    return nil, status.Error(codes.Unimplemented, "")
-}
-
-// ControllerExpandVolume - not supported
-func (s *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (
-    *csi.ControllerExpandVolumeResponse,
-    error,
-) {
-    s.log.WithField("func", "ControllerExpandVolume()").Warnf("request: '%+v' - not implemented", req)
     return nil, status.Error(codes.Unimplemented, "")
 }
 
