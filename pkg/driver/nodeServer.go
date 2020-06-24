@@ -278,13 +278,20 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
     if capability.GetMount() != nil {
         fsType := capability.GetMount().GetFsType()
-        if fsType == "" {
-            fsType = "ext4"
+        deviceFS := s.getFSType(devName)
+        if deviceFS == "" {
+            if fsType == "" {
+                fsType = "ext4"
+            }
+            err = s.formatVolume(devName, fsType)
+            if err != nil {
+                return nil, err
+            }
+        } else if deviceFS != fsType {
+            return nil, fmt.Errorf(
+                "Volume %s is already formatted in %s, requested: %s,", volumeID, deviceFS, fsType)
         }
-        err = s.formatVolume(devName, fsType)
-        if err != nil {
-            return nil, err
-        }
+
         err = s.mountVolume(devName, targetPath, fsType, req)
         if err != nil {
             return nil, err
@@ -604,4 +611,28 @@ func stringInArray(arr []string, tofind string) bool {
         }
     }
     return false
+}
+
+// getFSType returns the filesystem for the supplied devName.
+func (s *NodeServer) getFSType(devName string) string {
+    l := s.log.WithField("func", "getFSType()")
+    cmd := exec.Command("blkid", devName)
+    l.Infof("Executing command: %+v", cmd)
+    out, err := cmd.CombinedOutput()
+    fsType := ""
+    if err != nil {
+        l.Infof("Could not get FSType for device.")
+        return fsType
+    }
+
+    if strings.Contains(string(out), "TYPE=") {
+        for _, v := range strings.Split(string(out), " ") {
+            if strings.Contains(v, "TYPE=") {
+                fsType = strings.Split(v, "=")[1]
+                fsType = strings.Replace(fsType, "\"", "", -1)
+                fsType = strings.TrimSpace(fsType)
+            }
+        }
+    }
+    return fsType
 }

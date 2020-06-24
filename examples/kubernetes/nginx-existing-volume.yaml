@@ -43,6 +43,7 @@ spec:
     driver: nexentastor-block-csi-driver.nexenta.com
     # volumeHandle should be of the following format: <configName>:<path-to-filesystem>
     volumeHandle: nstor-box1:csiDriverPool/csiVolumeGroup/nginx-existing
+    fsType: ext4
   #mountOptions:  # list of options for `mount` command
   #  - noatime    #
 ---
