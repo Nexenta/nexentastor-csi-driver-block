@@ -267,11 +267,6 @@ func (s *ControllerServer) ValidateVolumeCapabilities(ctx context.Context, req *
 }
 
 func validateVolumeCapability(requestedVolumeCapability *csi.VolumeCapability) bool {
-    // block is not supported
-    if requestedVolumeCapability.GetBlock() == nil {
-        return false
-    }
-
     requestedMode := requestedVolumeCapability.GetAccessMode().GetMode()
 
     for _, volumeCapability := range supportedVolumeCapabilities {

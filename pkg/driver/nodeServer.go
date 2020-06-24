@@ -15,7 +15,9 @@ import (
     "golang.org/x/net/context"
     "google.golang.org/grpc/codes"
     "google.golang.org/grpc/status"
+    "k8s.io/kubernetes/pkg/util/mount"
 
+    "github.com/cenkalti/backoff"
     "github.com/Nexenta/go-nexentastor/pkg/ns"
     "github.com/Nexenta/nexentastor-csi-driver-block/pkg/config"
 )
@@ -92,9 +94,15 @@ func (s *NodeServer) resolveNS(configName, volumeGroup string) (nsProvider ns.Pr
 // ISCSILogInRescan - Attempts login to iSCSI target, rescan if already logged.
 func (s* NodeServer) ISCSILogInRescan(target, portal string) (error) {
     l := s.log.WithField("func", "ISCSILogInRescan()")
-    cmd := exec.Command("iscsiadm", "-m", "node", "-T", target, "-p", portal, "-l")
+    cmd := exec.Command("iscsiadm", "-m", "discovery", "-t", "sendtargets", "-p", portal)
     l.Infof("Executing command: %+v", cmd)
     out, err := cmd.CombinedOutput()
+    if err != nil {
+        return err
+    }
+    cmd = exec.Command("iscsiadm", "-m", "node", "-T", target, "-p", portal, "-l")
+    l.Infof("Executing command: %+v", cmd)
+    out, err = cmd.CombinedOutput()
     if err != nil {
         if !strings.Contains(string(out), "already present") {
             return err
@@ -112,11 +120,14 @@ func (s* NodeServer) ISCSILogInRescan(target, portal string) (error) {
 
 // getRealDeviceName - get device name (e.g. /dev/sdb) from a symlink
 func (s *NodeServer) GetRealDeviceName(symLink string) (string, error) {
+    l := s.log.WithField("func", "GetRealDeviceName()")
+    l.Infof("Evaluating symLink: %s", symLink)
     devName, err := filepath.EvalSymlinks(fmt.Sprintf("/host/%s", symLink))
     if err != nil {
         return "", err
     }
     devName = strings.TrimPrefix(devName, "/host")
+    l.Infof("Device name is: %s", devName)
     return devName, err
 }
 
@@ -158,6 +169,7 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     l.Infof("request: '%+v'", protosanitizer.StripSecrets(req))
     volumeContext := req.GetVolumeContext()
     volumeID := req.GetVolumeId()
+    capability := req.GetVolumeCapability()
     if len(volumeID) == 0 {
         return nil, status.Error(codes.InvalidArgument, "req.VolumeId must be provided")
     }
@@ -191,11 +203,20 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     
     hostGroup := volumeContext["HostGroup"]
     if hostGroup == "" {
-        hostGroup = DefaultHostGroup
+        if cfg.DefaultHostGroup != "" {
+            hostGroup = cfg.DefaultHostGroup
+        } else {
+            hostGroup = DefaultHostGroup
+        }
     }
+    targetGroup := volumeContext["TargetGroup"]
+    if targetGroup == "" {
+        targetGroup = cfg.DefaultTargetGroup
+    }
+
     err = nsProvider.CreateLunMapping(ns.CreateLunMappingParams{
         Volume: volumePath,
-        TargetGroup: volumeContext["TargetGroup"],
+        TargetGroup: targetGroup,
         HostGroup: hostGroup,
     })
     if err != nil{
@@ -204,10 +225,22 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 
     port := volumeContext["iSCSIPort"]
     if port == "" {
-        port = DefaultISCSIPort
+        if cfg.DefaultISCSIPort != "" {
+            port = cfg.DefaultISCSIPort
+        } else {
+            port = DefaultISCSIPort
+        }
     }
-    portal := fmt.Sprintf("%s:%s", volumeContext["DataIP"], port)
-    err = s.ISCSILogInRescan(volumeContext["Target"], portal)
+    dataIP := volumeContext["dataIP"]
+    if dataIP == "" {
+        dataIP = cfg.DefaultDataIP
+    }
+    portal := fmt.Sprintf("%s:%s", dataIP, port)
+    target := volumeContext["Target"]
+    if target == "" {
+        target = cfg.DefaultTarget
+    }
+    err = s.ISCSILogInRescan(target, portal)
     if err != nil {
         return nil, err
     }
@@ -226,7 +259,7 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     }
     devByPath := strings.Join([]string{
         "/dev/disk/by-path/ip", portal,
-        "iscsi", volumeContext["Target"], "lun", strconv.Itoa(lunNumber)}, "-")
+        "iscsi", target, "lun", strconv.Itoa(lunNumber)}, "-")
     // check if device is visible, wait if not
     found := false
     sleepTime := 100 * time.Millisecond
@@ -243,14 +276,133 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
         return nil, err
     }
 
-    cmd := exec.Command("ln", "-s", devName, targetPath)
-    l.Infof("Executing command: %+v", cmd)
-    _, err = cmd.CombinedOutput()
-    if err != nil {
-        return nil, err
+    if capability.GetMount() != nil {
+        fsType := capability.GetMount().GetFsType()
+        if fsType == "" {
+            fsType = "ext4"
+        }
+        err = s.formatVolume(devName, fsType)
+        if err != nil {
+            return nil, err
+        }
+        err = s.mountVolume(devName, targetPath, fsType, req)
+        if err != nil {
+            return nil, err
+        }
+    } else {
+        cmd := exec.Command("ln", "-s", devName, targetPath)
+        l.Infof("Executing command: %+v", cmd)
+        _, err = cmd.CombinedOutput()
+        if err != nil {
+            return nil, err
+        }
     }
-    l.Infof("Found device at %s", devName)
+    l.Infof("Device %s mounted to %s", devName, targetPath)
     return &csi.NodePublishVolumeResponse{}, nil
+}
+
+func (s *NodeServer) mountVolume(devName, targetPath, fsType string, req *csi.NodePublishVolumeRequest) error {
+    l := s.log.WithField("func", "mountVolume()")
+    l.Infof("Mounting device %s to targetPath %s", devName, targetPath)
+
+    mounter := mount.New("")
+    notMnt, err := mounter.IsLikelyNotMountPoint(targetPath)
+    if err != nil {
+        if os.IsNotExist(err) {
+            if err := os.MkdirAll(targetPath, 0750); err != nil {
+                l.Errorf("Failed to mkdir to target path %s. Error: %s", targetPath, err)
+                return status.Error(codes.Internal, err.Error())
+            }
+            notMnt = true
+        } else {
+            l.Errorf("Failed to mkdir to target path %s. Error: %s", targetPath, err)
+            return status.Error(codes.Internal, err.Error())
+        }
+    }
+
+    if !notMnt {
+        l.Warningf("Skipped mount volume %s. Error: %s", targetPath, err)
+        return nil
+    }
+
+    readOnly := req.GetReadonly()
+    mountOptions := req.GetVolumeCapability().GetMount().GetMountFlags()
+
+    if readOnly {
+        if !stringInArray(mountOptions, "ro") {
+            mountOptions = append(mountOptions, "ro")
+        }
+    }
+
+    l.Infof("target %v, fstype %v, readonly %v, mountOptions %v", targetPath, fsType, readOnly, mountOptions)
+    err = mounter.Mount(fmt.Sprintf("/host%s", devName), targetPath, fsType, []string{})
+    if err != nil {
+        if os.IsPermission(err) {
+            l.Errorf("Failed to mount device %s. Error: %v", devName, err)
+            return status.Error(codes.PermissionDenied, err.Error())
+        }
+        if strings.Contains(err.Error(), "invalid argument") {
+            l.Errorf("Failed to mount device %s. Error: %v", devName, err)
+            return status.Error(codes.InvalidArgument, err.Error())
+        }
+        l.Errorf("Failed to mount device %+v. Error: %v", devName, err)
+        return status.Error(codes.Internal, err.Error())
+    }
+    return nil
+}
+
+// formatVolume creates a filesystem for the supplied device of the supplied type.
+func (s *NodeServer) formatVolume(device, fstype string) error {
+    l := s.log.WithField("func", "formatVolume()")
+
+    start := time.Now()
+    maxDuration := 30 * time.Second
+
+    formatVolume := func() error {
+
+        var err error
+        l.Infof("Trying to format %s via %s", device, fstype)
+        switch fstype {
+        case "xfs":
+            cmd := exec.Command("mkfs.xfs", "-K", "-f", device)
+            l.Infof("Executing command: %+v", cmd)
+            _, err = cmd.CombinedOutput()
+        case "ext3":
+            cmd := exec.Command("mkfs.ext3", "-E", "nodiscard", "-F", device)
+            l.Infof("Executing command: %+v", cmd)
+            _, err = cmd.CombinedOutput()
+        case "ext4":
+            cmd := exec.Command("mkfs.ext4", "-E", "nodiscard", "-F", device)
+            l.Infof("Executing command: %+v", cmd)
+            _, err = cmd.CombinedOutput()
+        default:
+            return fmt.Errorf("unsupported file system type: %s", fstype)
+        }
+
+        if err != nil {
+            l.Errorf("Formating error %s", err)
+        }
+        return err
+    }
+
+    formatNotify := func(err error, duration time.Duration) {
+        l.Info("Format failed, retrying. Duration: %v", duration)
+    }
+
+    formatBackoff := backoff.NewExponentialBackOff()
+    formatBackoff.InitialInterval = 2 * time.Second
+    formatBackoff.Multiplier = 2
+    formatBackoff.RandomizationFactor = 0.1
+    formatBackoff.MaxElapsedTime = maxDuration
+
+    // Run the check/rescan using an exponential backoff
+    if err := backoff.RetryNotify(formatVolume, formatBackoff, formatNotify); err != nil {
+        l.Infof("Could not format device after %3.2f seconds.", maxDuration.Seconds())
+        return err
+    }
+    elapsed := time.Since(start)
+    l.Infof("Device formatted in %s", elapsed)
+    return nil
 }
 
 // NodeUnpublishVolume - umount NS fs from the node and delete directory if successful
@@ -296,10 +448,23 @@ func (s *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
             return nil, err
         }
     }
-    dev, err := s.GetRealDeviceName(targetPath)
+
+    port := cfg.DefaultISCSIPort
+    if port == "" {
+        port = DefaultISCSIPort
+    }
+    dataIP := cfg.DefaultDataIP
+    portal := fmt.Sprintf("%s:%s", dataIP, port)
+    target := cfg.DefaultTarget
+    lunNumber := getLunResp.Lun
+    devByPath := strings.Join([]string{
+        "/dev/disk/by-path/ip", portal,
+        "iscsi", target, "lun", strconv.Itoa(lunNumber)}, "-")
+    dev, err := s.GetRealDeviceName(devByPath)
     if err != nil {
         return nil, err
     }
+
     err = s.RemoveDevice(dev)
     if err != nil {
         return nil, err
@@ -430,4 +595,13 @@ func NewNodeServer(driver *Driver) (*NodeServer, error) {
         config:         driver.config,
         log:            l,
     }, nil
+}
+
+func stringInArray(arr []string, tofind string) bool {
+    for _, item := range arr {
+        if item == tofind {
+            return true
+        }
+    }
+    return false
 }
