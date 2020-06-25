@@ -1,0 +1,19 @@
+# ------------------------------------------------------------------------------------------
+# NexentaStor CSI Driver - Persistent Volume Claim cloned from snapshot
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nexentastor-block-csi-driver-pvc-nginx-snapshot-restore
+spec:
+  storageClassName: nexentastor-block-csi-driver-sc-nginx-dynamic
+  dataSource:
+    kind: VolumeSnapshot
+    apiGroup: snapshot.storage.k8s.io
+    name: snapshot-test # snapshots created by ./take-snapshot.yaml
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+---
