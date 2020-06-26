@@ -597,8 +597,16 @@ func TestDriver_deploy(t *testing.T) {
 			}
 			t.Fatal(fmt.Errorf("Data hasn't been written to nginx container: %s", err))
 		}
-		// Can't write data to cloned volume without timeout
-		time.Sleep(25 * time.Second)
+		t.Log("send sync command to write data from cache to storage")
+		if _, err := rc.Exec(getNginxRunCommand("sync")); err != nil {
+			l.Warn("Can't sync data")
+		}
+		if _, err := rc.Exec(getNginxRunCommand("sync")); err != nil {
+			l.Warn("Can't sync data")
+		}
+		if _, err := rc.Exec(getNginxRunCommand("sync")); err != nil {
+			l.Warn("Can't sync data")
+		}
 
 		k8sNginxClone, err := k8s.NewDeployment(k8s.DeploymentArgs{
 			RemoteClient: rc,
