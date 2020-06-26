@@ -457,7 +457,7 @@ func TestDriver_deploy(t *testing.T) {
 		t.Log("deploy second container using the snapshot")
 		k8sNginx2, err := k8s.NewDeployment(k8s.DeploymentArgs{
 			RemoteClient: rc,
-			ConfigFile:   "../../examples/kubernetes/nginx-snapshot-volume.yaml",
+			ConfigFile:   "../../examples/kubernetes/nginx-dynamic-from-snapshot.yaml",
 			Log:          l,
 		})
 		defer k8sNginx2.CleanUp()
@@ -540,6 +540,115 @@ func TestDriver_deploy(t *testing.T) {
 		testResult.StatusID = 1
 		testResult.Comment = "Recovery from snapshot - success"
 		if _, err := client.AddResultForCase(5151, 801267, testResult); err != nil {
+			l.Warn("Can't add test result to TestRail")
+		}
+
+		t.Log("done.")
+	})
+
+	t.Run("volume cloning check", func(t *testing.T) {
+		nginxPodName := "nginx-dynamic-volume"
+		nginxClonePodName := "nginx-dynamic-volume-clone"
+
+		testResult.StatusID = 5
+		testResult.Comment = "Volume clone - failed"
+
+		getNginxRunCommand := func(cmd string) string {
+			return fmt.Sprintf("kubectl exec -c nginx %s -- /bin/bash -c \"%s\"", nginxPodName, cmd)
+		}
+		getNginxCloneRunCommand := func(cmd string) string {
+			return fmt.Sprintf("kubectl exec -c nginx %s -- /bin/bash -c \"%s\"", nginxClonePodName, cmd)
+		}
+
+		k8sNginx, err := k8s.NewDeployment(k8s.DeploymentArgs{
+			RemoteClient: rc,
+			ConfigFile:   "../../examples/kubernetes/nginx-dynamic-volume.yaml",
+			Log:          l,
+		})
+		defer k8sNginx.CleanUp()
+		defer k8sNginx.Delete(nil)
+		if err != nil {
+			if _, err := client.AddResultForCase(5151, 801270, testResult); err != nil {
+				l.Warn("Can't add test result to TestRail")
+			}
+			t.Fatalf("Cannot create K8s nginx deployment: %s", err)
+		}
+
+		t.Log("deploy nginx container with read-write volume")
+		if err := k8sNginx.Apply([]string{nginxPodName + ".*Running"}); err != nil {
+			if _, err := client.AddResultForCase(5151, 801270, testResult); err != nil {
+				l.Warn("Can't add test result to TestRail")
+			}
+			t.Fatal(err)
+		}
+
+		t.Log("write data to the volume")
+		if _, err := rc.Exec(getNginxRunCommand("echo 'test' > /mountedDisk/data.txt")); err != nil {
+			if _, err := client.AddResultForCase(5151, 801270, testResult); err != nil {
+				l.Warn("Can't add test result to TestRail")
+			}
+			t.Fatal(fmt.Errorf("Cannot write data to nginx volume: %s", err))
+		}
+
+		t.Log("check if the data has been written to the volume")
+		if _, err := rc.Exec(getNginxRunCommand("grep 'test' /mountedDisk/data.txt")); err != nil {
+			if _, err := client.AddResultForCase(5151, 801270, testResult); err != nil {
+				l.Warn("Can't add test result to TestRail")
+			}
+			t.Fatal(fmt.Errorf("Data hasn't been written to nginx container: %s", err))
+		}
+		// Can't write data to cloned volume without timeout
+		time.Sleep(25 * time.Second)
+
+		k8sNginxClone, err := k8s.NewDeployment(k8s.DeploymentArgs{
+			RemoteClient: rc,
+			ConfigFile:   "../../examples/kubernetes/nginx-clone-volume.yaml",
+			Log:          l,
+		})
+		defer k8sNginxClone.CleanUp()
+		defer k8sNginxClone.Delete(nil)
+		if err != nil {
+			if _, err := client.AddResultForCase(5151, 801270, testResult); err != nil {
+				l.Warn("Can't add test result to TestRail")
+			}
+			t.Fatalf("Cannot create K8s nginx deployment: %s", err)
+		}
+
+		t.Log("deploy nginx container with cloned volume")
+		if err := k8sNginxClone.Apply([]string{nginxClonePodName + ".*Running"}); err != nil {
+			if _, err := client.AddResultForCase(5151, 801270, testResult); err != nil {
+				l.Warn("Can't add test result to TestRail")
+			}
+			t.Fatal(err)
+		}
+
+		t.Log("check if the data has been written to the cloned volume")
+		if _, err := rc.Exec(getNginxCloneRunCommand("grep 'test' /mountedDisk/data.txt")); err != nil {
+			if _, err := client.AddResultForCase(5151, 801270, testResult); err != nil {
+				l.Warn("Can't add test result to TestRail")
+			}
+			t.Fatal(fmt.Errorf("Data hasn't been written to nginx container: %s", err))
+		}
+
+		t.Log("delete the nginx clone container with read-write volume")
+		if err := k8sNginxClone.Delete([]string{nginxClonePodName}); err != nil {
+			if _, err := client.AddResultForCase(5151, 801270, testResult); err != nil {
+				l.Warn("Can't add test result to TestRail")
+			}
+			t.Fatal(err)
+		}
+
+		t.Log("delete the nginx container with read-write volume")
+		if err := k8sNginx.Delete([]string{nginxPodName}); err != nil {
+			if _, err := client.AddResultForCase(5151, 801270, testResult); err != nil {
+				l.Warn("Can't add test result to TestRail")
+			}
+			t.Fatal(err)
+		}
+
+		testResult.StatusID = 1
+		testResult.Comment = "Volume clone - success"
+		if _, err := client.AddResultForCase(5151, 801270, testResult); err != nil {
 			l.Warn("Can't add test result to TestRail")
 		}
 

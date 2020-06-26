@@ -14,10 +14,10 @@ spec:
     name: nexentastor-block-csi-driver-pvc-nginx-dynamic # pvc name
   accessModes:
     - ReadWriteMany
-  volumeMode: Block
+  # volumeMode: Block
   resources:
     requests:
-      storage: 1Gi
+      storage: 2Gi
 ---
 
 # ---------
@@ -36,8 +36,10 @@ spec:
       ports:
         - containerPort: 80
           protocol: TCP
-      volumeDevices:
-        - devicePath: /dev/sdd
+      # volumeDevices:
+      volumeMounts:
+        #  - devicePath: /dev/sdc
+        - mountPath: /mountedDisk
           name: nexentastor-block-csi-driver-data-clone
   volumes:
     - name: nexentastor-block-csi-driver-data-clone
