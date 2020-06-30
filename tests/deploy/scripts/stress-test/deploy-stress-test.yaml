@@ -1,0 +1,42 @@
+# Nginx pod with dynamically storage creation using NexentaStor block CSI driver
+
+# ------------------------------------------------
+# NexentaStor Block CSI Driver - Persistent Volume Claim
+# ------------------------------------------------
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nexentastor-block-csi-driver-pvc-nginx-manual-auto
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: nexentastor-block-csi-driver-sc-nginx-stress-test
+---
+
+# ---------
+# Nginx pod
+# ---------
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-dynamic-volume-auto
+spec:
+  containers:
+    - image: progrium/stress
+      imagePullPolicy: IfNotPresent
+      name: stress
+      command: ["bash"]
+      args: ["-c", "cd /data && /usr/bin/stress --verbose --hdd 1 --hdd-bytes 500M"] #--hdd-noclean
+      volumeMounts:
+        - mountPath: /data
+          name: nexentastor-block-csi-driver-data-auto
+  volumes:
+    - name: nexentastor-block-csi-driver-data-auto
+      persistentVolumeClaim:
+        claimName: nexentastor-block-csi-driver-pvc-nginx-manual-auto
+        readOnly: false
