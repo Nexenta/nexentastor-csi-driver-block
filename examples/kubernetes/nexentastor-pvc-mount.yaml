@@ -1,0 +1,17 @@
+# ------------------------------------------------
+# NexentaStor CSI Driver - Persistent Volume Claim
+# ------------------------------------------------
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nexentastor-block-csi-driver-pvc-nginx-dynamic
+spec:
+  storageClassName: nexentastor-block-csi-driver-sc-nginx-dynamic
+  accessModes:
+    - ReadWriteMany
+  # volumeMode: Block
+  resources:
+    requests:
+      storage: 5Gi
+---

@@ -30,6 +30,15 @@ type NodeServer struct {
     log             *logrus.Entry
 }
 
+type CreateMappingParams struct {
+    Address     string
+    Target      string
+    TargetGroup string
+    Port        string
+    VolumePath  string
+    HostGroup   string
+}
+
 const (
     DefaultISCSIPort = "3260"
     DefaultHostGroup = "all"
@@ -213,16 +222,6 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     if targetGroup == "" {
         targetGroup = cfg.DefaultTargetGroup
     }
-
-    err = nsProvider.CreateLunMapping(ns.CreateLunMappingParams{
-        Volume: volumePath,
-        TargetGroup: targetGroup,
-        HostGroup: hostGroup,
-    })
-    if err != nil{
-        return nil, err
-    }
-
     port := volumeContext["iSCSIPort"]
     if port == "" {
         if cfg.DefaultISCSIPort != "" {
@@ -235,11 +234,25 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     if dataIP == "" {
         dataIP = cfg.DefaultDataIP
     }
-    portal := fmt.Sprintf("%s:%s", dataIP, port)
     target := volumeContext["Target"]
     if target == "" {
         target = cfg.DefaultTarget
     }
+    portal := fmt.Sprintf("%s:%s", dataIP, port)
+
+    params := CreateMappingParams{
+        Address: dataIP,
+        Target: target,
+        TargetGroup: targetGroup,
+        Port: port,
+        VolumePath: volumePath,
+        HostGroup: hostGroup,
+    }
+    err = s.CreateISCSIMapping(params, nsProvider)
+    if err != nil {
+        return nil, err
+    }
+
     err = s.ISCSILogInRescan(target, portal)
     if err != nil {
         return nil, err
@@ -306,6 +319,47 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     }
     l.Infof("Device %s mounted to %s", devName, targetPath)
     return &csi.NodePublishVolumeResponse{}, nil
+}
+
+func (s *NodeServer) CreateISCSIMapping(params CreateMappingParams, nsProvider ns.ProviderInterface) error {
+    l := s.log.WithField("func", "CreateISCSIMapping()")
+    l.Infof("Creating iSCSI mapping with params: %+v", params)
+
+    iSCSIParams := ns.CreateISCSITargetParams{
+        Name: params.Target,
+    }
+    portInt, err := strconv.Atoi(params.Port)
+    if err != nil {
+        l.Errorf("Could not convert port to int, port: %s, err: %s", params.Port, err.Error())
+        return err
+    }
+    iSCSIParams.Portals = append(iSCSIParams.Portals, ns.Portal{
+        Address: params.Address,
+        Port: portInt,
+    })
+    err = nsProvider.CreateISCSITarget(iSCSIParams)
+    if err != nil {
+        return err
+    }
+
+    createTargetGroupParams := ns.CreateTargetGroupParams{
+        Name: params.TargetGroup,
+        Members: []string{params.Target},
+    }
+    err = nsProvider.CreateUpdateTargetGroup(createTargetGroupParams)
+    if err != nil {
+        return err
+    }
+
+    err = nsProvider.CreateLunMapping(ns.CreateLunMappingParams{
+        Volume: params.VolumePath,
+        TargetGroup: params.TargetGroup,
+        HostGroup: params.HostGroup,
+    })
+    if err != nil {
+        return err
+    }
+    return nil
 }
 
 func (s *NodeServer) mountVolume(devName, targetPath, fsType string, req *csi.NodePublishVolumeRequest) error {
