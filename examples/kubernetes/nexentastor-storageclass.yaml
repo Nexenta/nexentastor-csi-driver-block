@@ -1,0 +1,11 @@
+# --------------------------------------
+# NexentaStor CSI Driver - Storage Class
+# --------------------------------------
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nexentastor-block-csi-driver-sc-nginx-dynamic
+provisioner: nexentastor-block-csi-driver.nexenta.com
+allowVolumeExpansion: true
+---

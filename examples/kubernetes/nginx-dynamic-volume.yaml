@@ -11,8 +11,6 @@ kind: StorageClass
 metadata:
   name: nexentastor-block-csi-driver-sc-nginx-dynamic
 provisioner: nexentastor-block-csi-driver.nexenta.com
-mountOptions:                        # list of options for `mount -o ...` command
-#  - noatime                         #
 allowVolumeExpansion: true
 # volumeBindingMode: Immediate
 # allowedTopologies:
