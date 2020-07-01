@@ -1,0 +1,17 @@
+# Nginx pod with dynamic storage creation using NexentaStor CSI block driver
+#
+# $ kubectl apply -f deploy-stress-test-dynamic-volume.yaml
+#
+
+
+# --------------------------------------
+# NexentaStor CSI Block Driver - Storage Class
+# --------------------------------------
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nexentastor-block-csi-driver-sc-nginx-stress-test
+provisioner: nexentastor-block-csi-driver.nexenta.com
+---
+  
