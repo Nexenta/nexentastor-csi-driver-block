@@ -223,7 +223,6 @@ func TestDriver_deploy(t *testing.T) {
 	t.Run("deploy nginx pod with persistent volume", func(t *testing.T) {
 		command := ""
 		data := time.Now().Format(time.RFC3339)
-		//data := "TRY-1"
 		nginxPodName := "nginx-persistent-volume"
 		testResult.StatusID = 5
 		testResult.Comment = "Create Pod and Mount Volume - failed"
@@ -269,6 +268,17 @@ func TestDriver_deploy(t *testing.T) {
 				l.Warn("Can't add test result to TestRail")
 			}
 			t.Fatal(fmt.Errorf("Data hasn't been written to nginx container: %s", err))
+		}
+
+		t.Log("send sync command to write data from cache to storage")
+		if _, err := rc.Exec(getNginxRunCommand("sync")); err != nil {
+			l.Warn("Can't sync data")
+		}
+		if _, err := rc.Exec(getNginxRunCommand("sync")); err != nil {
+			l.Warn("Can't sync data")
+		}
+		if _, err := rc.Exec(getNginxRunCommand("sync")); err != nil {
+			l.Warn("Can't sync data")
 		}
 
 		t.Log("delete the first nginx container")
@@ -380,6 +390,17 @@ func TestDriver_deploy(t *testing.T) {
 			t.Fatal(fmt.Errorf("Data hasn't been written to nginx container: %s", err))
 		}
 
+		t.Log("send sync command to write data from cache to storage")
+		if _, err := rc.Exec(getNginxRunCommand(nginxPodName, "sync")); err != nil {
+			l.Warn("Can't sync data")
+		}
+		if _, err := rc.Exec(getNginxRunCommand(nginxPodName, "sync")); err != nil {
+			l.Warn("Can't sync data")
+		}
+		if _, err := rc.Exec(getNginxRunCommand(nginxPodName, "sync")); err != nil {
+			l.Warn("Can't sync data")
+		}
+
 		t.Log("create snapshot class")
 		k8sSnapshotClass, err := k8s.NewDeployment(k8s.DeploymentArgs{
 			RemoteClient: rc,
@@ -444,6 +465,17 @@ func TestDriver_deploy(t *testing.T) {
 				l.Warn("Can't add test result to TestRail")
 			}
 			t.Fatal(fmt.Errorf("Data hasn't been written to nginx container: %s", err))
+		}
+
+		t.Log("send sync command to write data from cache to storage")
+		if _, err := rc.Exec(getNginxRunCommand(nginxPodName, "sync")); err != nil {
+			l.Warn("Can't sync data")
+		}
+		if _, err := rc.Exec(getNginxRunCommand(nginxPodName, "sync")); err != nil {
+			l.Warn("Can't sync data")
+		}
+		if _, err := rc.Exec(getNginxRunCommand(nginxPodName, "sync")); err != nil {
+			l.Warn("Can't sync data")
 		}
 
 		t.Log("delete the first nginx container")

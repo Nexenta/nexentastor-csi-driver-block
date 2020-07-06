@@ -1,7 +1,7 @@
 # tests container
 FROM golang:1.13
 
-WORKDIR /go/src/github.com/Nexenta/nexentastor-csi-driver/
+WORKDIR /go/src/github.com/Nexenta/nexentastor-csi-driver-block/
 COPY . ./
 
 ARG VERSION
