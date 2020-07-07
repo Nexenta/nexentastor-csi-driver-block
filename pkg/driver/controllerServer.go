@@ -119,7 +119,7 @@ func (s *ControllerServer) resolveNS(params ResolveNSParams) (response ResolveNS
 }
 
 func (s *ControllerServer) resolveNSNoZone(params ResolveNSParams) (response ResolveNSResponse, err error) {
-    // No zone -> pick NS for given dataset and configName. TODO: load balancing
+    // No zone -> pick NS for given volumeGroup and configName. TODO: load balancing
     l := s.log.WithField("func", "resolveNSNoZone()")
     l.Infof("Resolving without zone, params: %+v", params)
     var nsProvider ns.ProviderInterface
@@ -194,7 +194,7 @@ func (s *ControllerServer) resolveNSWithZone(params ResolveNSParams) (response R
             if params.zone == s.config.NsMap[name].Zone {
                 nsProvider, err = resolver.ResolveFromVg(volumeGroup)
                 if nsProvider != nil {
-                    l.Infof("Found dataset %s on NexentaStor [%s]", volumeGroup, name)
+                    l.Infof("Found volumeGroup %s on NexentaStor [%s]", volumeGroup, name)
                     response = ResolveNSResponse{
                         volumeGroup: volumeGroup,
                         nsProvider: nsProvider,
@@ -370,9 +370,9 @@ func (s *ControllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacity
         reqParams = make(map[string]string)
     }
 
-    // get dataset path from runtime params, set default if not specified
+    // get volumeGroup path from runtime params, set default if not specified
     volumeGroup := ""
-    if v, ok := reqParams["dataset"]; ok {
+    if v, ok := reqParams["volumeGroup"]; ok {
         volumeGroup = v
     }
 
@@ -1132,7 +1132,7 @@ func convertNSSnapshotToCSISnapshot(snapshot ns.Snapshot, configName string) *cs
     }
 }
 
-// ListVolumes - list volumes, shows only volumes created in defaultDataset
+// ListVolumes - list volumes, shows only volumes created in defaultvolumeGroup
 func (s *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (
     *csi.ListVolumesResponse,
     error,
