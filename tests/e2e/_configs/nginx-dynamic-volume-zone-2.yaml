@@ -8,6 +8,7 @@ metadata:
   name: nexentastor-block-csi-driver-sc-nginx-dynamic
 provisioner: nexentastor-block-csi-driver.nexenta.com
 allowVolumeExpansion: true
+volumeBindingMode: Immediate
 allowedTopologies:
 - matchLabelExpressions:
   - key: topology.kubernetes.io/zone

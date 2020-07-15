@@ -721,7 +721,7 @@ func TestDriver_deploy(t *testing.T) {
 		defer k8sNginx2.CleanUp()
 		defer k8sNginx2.Delete(nil)
 		if err != nil {
-			if _, err := client.AddResultForCase(5151, 801256, testResult); err != nil {
+			if _, err := client.AddResultForCase(5151, 801272, testResult); err != nil {
 				l.Warn("Can't add test result to TestRail")
 			}
 			t.Fatalf("Cannot create K8s nginx deployment: %s", err)
@@ -736,7 +736,7 @@ func TestDriver_deploy(t *testing.T) {
 			// Try first zone
 			t.Log("deploy first nginx container on first k8s node")
 			if err := k8sNginx1.Apply([]string{nginxPodName + ".*Running"}); err != nil {
-				if _, err := client.AddResultForCase(5151, 801256, testResult); err != nil {
+				if _, err := client.AddResultForCase(5151, 801272, testResult); err != nil {
 					l.Warn("Can't add test result to TestRail")
 				}
 				t.Fatal(err)
@@ -744,7 +744,7 @@ func TestDriver_deploy(t *testing.T) {
 
 			t.Log("check if first nginx pod is on right node")
 			if _, err := rc.Exec(getZoneCommand("1")); err != nil {
-				if _, err := client.AddResultForCase(5151, 801256, testResult); err != nil {
+				if _, err := client.AddResultForCase(5151, 801272, testResult); err != nil {
 					l.Warn("Can't add test result to TestRail")
 				}
 				t.Fatal(fmt.Errorf("Cannot find nginx pod on right node: %s", err))
@@ -752,7 +752,7 @@ func TestDriver_deploy(t *testing.T) {
 
 			t.Log("delete first nginx container on first k8s node")
 			if err := k8sNginx1.Delete([]string{nginxPodName}); err != nil {
-				if _, err := client.AddResultForCase(5151, 801256, testResult); err != nil {
+				if _, err := client.AddResultForCase(5151, 801272, testResult); err != nil {
 					l.Warn("Can't add test result to TestRail")
 				}
 				t.Fatal(err)
@@ -760,7 +760,7 @@ func TestDriver_deploy(t *testing.T) {
 			// Try second zone
 			t.Log("deploy second nginx container on second k8s node")
 			if err := k8sNginx2.Apply([]string{nginxPodName + ".*Running"}); err != nil {
-				if _, err := client.AddResultForCase(5151, 801256, testResult); err != nil {
+				if _, err := client.AddResultForCase(5151, 801272, testResult); err != nil {
 					l.Warn("Can't add test result to TestRail")
 				}
 				t.Fatal(err)
@@ -768,7 +768,7 @@ func TestDriver_deploy(t *testing.T) {
 
 			t.Log("check if second nginx pod is on right node")
 			if _, err := rc.Exec(getZoneCommand("2")); err != nil {
-				if _, err := client.AddResultForCase(5151, 801256, testResult); err != nil {
+				if _, err := client.AddResultForCase(5151, 801272, testResult); err != nil {
 					l.Warn("Can't add test result to TestRail")
 				}
 				t.Fatal(fmt.Errorf("Cannot find nginx pod on right node: %s", err))
@@ -776,7 +776,7 @@ func TestDriver_deploy(t *testing.T) {
 
 			t.Log("delete second nginx container on second k8s node")
 			if err := k8sNginx2.Delete([]string{nginxPodName}); err != nil {
-				if _, err := client.AddResultForCase(5151, 801256, testResult); err != nil {
+				if _, err := client.AddResultForCase(5151, 801272, testResult); err != nil {
 					l.Warn("Can't add test result to TestRail")
 				}
 				t.Fatal(err)
@@ -784,7 +784,7 @@ func TestDriver_deploy(t *testing.T) {
 		}
 		testResult.StatusID = 1
 		testResult.Comment = "Create Pod and Mount Volume in Specific Zone - success"
-		if _, err := client.AddResultForCase(5151, 801256, testResult); err != nil {
+		if _, err := client.AddResultForCase(5151, 801272, testResult); err != nil {
 			l.Warn("Can't add test result to TestRail")
 		}
 
