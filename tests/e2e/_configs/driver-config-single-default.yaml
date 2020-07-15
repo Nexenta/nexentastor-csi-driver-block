@@ -9,7 +9,7 @@ nexentastor_map:
       defaultTarget: iqn.2005-07.com.nexenta:01:test
       defaultHostGroup: all
       zone: zone-1
-    nstor-box1:
+    nstor-box2:
       restIp: https://10.3.199.197:8443
       username: admin
       password: Nexenta@1
