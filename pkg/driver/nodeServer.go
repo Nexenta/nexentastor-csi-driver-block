@@ -530,6 +530,42 @@ func (s *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
     if err != nil {
         return nil, err
     }
+    targetPath = req.GetTargetPath()
+    if len(targetPath) == 0 {
+        return nil, status.Error(codes.InvalidArgument, "Target path must be provided")
+    }
+
+    mounter := mount.New("")
+
+    notMountPoint, err := mounter.IsLikelyNotMountPoint(targetPath)
+    if err != nil {
+        if os.IsNotExist(err) {
+            l.Warnf("mount point '%s' already doesn't exist: '%s', return OK", targetPath, err)
+            return &csi.NodeUnpublishVolumeResponse{}, nil
+        }
+        return nil, status.Errorf(
+            codes.Internal,
+            "Cannot ensure that target path '%s' is a mount point: '%s'",
+            targetPath,
+            err,
+        )
+    }
+
+    if notMountPoint {
+        if err := os.Remove(targetPath); err != nil {
+            l.Infof("Remove target path error: %s", err.Error())
+        }
+        return &csi.NodeUnpublishVolumeResponse{}, nil
+    }
+
+    if err := mounter.Unmount(targetPath); err != nil {
+        return nil, status.Errorf(codes.Internal, "Failed to unmount target path '%s': %s", targetPath, err)
+    }
+
+    if err := os.Remove(targetPath); err != nil && !os.IsNotExist(err) {
+        return nil, status.Errorf(codes.Internal, "Cannot remove unmounted target path '%s': %s", targetPath, err)
+    }
+
     return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 

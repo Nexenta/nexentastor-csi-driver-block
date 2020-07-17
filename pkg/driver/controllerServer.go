@@ -186,12 +186,10 @@ func (s *ControllerServer) resolveNSWithZone(params ResolveNSParams) (response R
         return response, nil
     } else {
         for name, resolver := range s.nsResolverMap {
-            if params.volumeGroup == "" {
-                volumeGroup = s.config.NsMap[name].DefaultVolumeGroup
-            } else {
-                volumeGroup = params.volumeGroup
-            }
             if params.zone == s.config.NsMap[name].Zone {
+                if volumeGroup == "" {
+                    volumeGroup = s.config.NsMap[name].DefaultVolumeGroup
+                }
                 nsProvider, err = resolver.ResolveFromVg(volumeGroup)
                 if nsProvider != nil {
                     l.Infof("Found volumeGroup %s on NexentaStor [%s]", volumeGroup, name)
@@ -385,12 +383,11 @@ func (s *ControllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacity
     }
 
     nsProvider := resolveResp.nsProvider
-    filesystem, err := nsProvider.GetFilesystem(resolveResp.volumeGroup)
+    vgData, err := nsProvider.GetVolumeGroup(resolveResp.volumeGroup)
     if err != nil {
         return nil, err
     }
-
-    availableCapacity := filesystem.GetReferencedQuotaSize()
+    availableCapacity := vgData.BytesAvailable
     l.Infof("Available capacity: '%+v' bytes", availableCapacity)
     return &csi.GetCapacityResponse{
         AvailableCapacity: availableCapacity,
@@ -478,6 +475,9 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
 
     // get requested volume size from runtime params, set default if not specified
     capacityBytes := req.GetCapacityRange().GetRequiredBytes()
+    if capacityBytes == 0 {
+        capacityBytes = 1073741824
+    }
     if sourceSnapshotId != "" {
         // create new volume using existing snapshot
         splittedSnap := strings.Split(sourceSnapshotId, ":")
@@ -598,6 +598,23 @@ func (s *ControllerServer) createNewVolume(
 
     if err != nil {
         if ns.IsAlreadyExistNefError(err) {
+            existingVolume, err := nsProvider.GetVolume(volumePath)
+            if err != nil {
+                return status.Errorf(
+                    codes.Internal,
+                    "Volume '%s' already exists, but volume properties request failed: %s",
+                    volumePath,
+                    err,
+                )
+            } else if capacityBytes != 0 && existingVolume.VolumeSize != capacityBytes {
+                return status.Errorf(
+                    codes.AlreadyExists,
+                    "Volume '%s' already exists, but with a different size: requested=%d, existing=%d",
+                    volumePath,
+                    capacityBytes,
+                    existingVolume.VolumeSize,
+                )
+            }
             l.Infof("volume '%s' already exists and can be used", volumePath)
             return nil
         }
@@ -939,7 +956,6 @@ func (s *ControllerServer) DeleteSnapshot(ctx context.Context, req *csi.DeleteSn
 
     // if here, than snapshotPath exists on some NS
     snapshotPath := strings.Join([]string{volumePath, snapshot}, "@")
-    l.Warnf(snapshotPath)
     err = nsProvider.DestroySnapshot(snapshotPath)
     if err != nil && !ns.IsNotExistNefError(err) {
         message := fmt.Sprintf("Failed to delete snapshot '%s'", snapshotPath)
@@ -1137,8 +1153,60 @@ func (s *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumes
     *csi.ListVolumesResponse,
     error,
 ) {
-    s.log.WithField("func", "ListVolumes()").Warnf("request: '%+v' - not implemented", req)
-    return nil, status.Error(codes.Unimplemented, "")
+    l := s.log.WithField("func", "ListVolumes()")
+    l.Infof("request: '%+v'", protosanitizer.StripSecrets(req))
+    startingToken := req.GetStartingToken()
+
+    maxEntries := int(req.GetMaxEntries())
+    if maxEntries < 0 {
+        return nil, status.Errorf(codes.InvalidArgument, "req.MaxEntries must be 0 or greater, got: %d", maxEntries)
+    }
+
+    err := s.refreshConfig("")
+    if err != nil {
+        return nil, status.Errorf(codes.Aborted, "Cannot use config file: %s", err)
+    }
+    nextToken := ""
+    entries := []*csi.ListVolumesResponse_Entry{}
+    volumes := []ns.Volume{}
+    for configName, _ := range s.config.NsMap {
+        params := ResolveNSParams{
+            configName: configName,
+        }
+        resolveResp, err := s.resolveNS(params)
+        if err != nil {
+            return nil, err
+        }
+        nsProvider := resolveResp.nsProvider
+        volumeGroup := resolveResp.volumeGroup
+
+        volumes, nextToken, err = nsProvider.GetVolumesWithStartingToken(
+            volumeGroup,
+            startingToken,
+            maxEntries,
+        )
+
+        for _, item := range volumes {
+            entries = append(entries, &csi.ListVolumesResponse_Entry{
+                Volume: &csi.Volume{VolumeId: fmt.Sprintf("%s:%s", configName, item.Path)},
+            })
+        }
+    }
+        
+    if startingToken != "" && len(entries) == 0 {
+        return nil, status.Errorf(
+            codes.Aborted,
+            fmt.Sprintf("Failed to find filesystem started from token '%s': %s", startingToken, err),
+        )
+    }
+
+
+    l.Infof("found %d entries(s)", len(entries))
+
+    return &csi.ListVolumesResponse{
+        Entries:   entries,
+        NextToken: nextToken,
+    }, nil
 }
 
 // ControllerPublishVolume - not supported

@@ -131,7 +131,7 @@ test-csi-sanity-container:
 		--build-arg CSI_SANITY_VERSION_TAG=v2.1.0 \
 		-f ${DOCKER_FILE_TEST_CSI_SANITY} \
 		-t ${IMAGE_NAME}-test-csi-sanity .
-	docker run --privileged=true -i -e NOCOLORS=${NOCOLORS} ${IMAGE_NAME}-test-csi-sanity
+	docker run --network host --privileged=true --mount type=bind,source=/,target=/host,bind-propagation=rshared --mount type=bind,source=/tmp,target=/tmp,bind-propagation=rshared -i -e NOCOLORS=${NOCOLORS} ${IMAGE_NAME}-test-csi-sanity
 
 # run all tests (local registry image)
 .PHONY: test-all-local-image
