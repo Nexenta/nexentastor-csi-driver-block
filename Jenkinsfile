@@ -32,7 +32,7 @@ pipeline {
         }
         stage('Tests [csi-sanity]') {
             steps {
-                echo "here it will be csi sanity tests"
+                sh 'make test-csi-sanity-container'
             }
         }
         stage('Push [local registry]') {
