@@ -112,9 +112,6 @@ Releases can be found here - https://github.com/Nexenta/nexentastor-csi-driver-b
 
    **Note**: all default parameters (`default*`) may be overwritten in specific _StorageClass_ configuration.
 
-   **Note**: if `defaultMountFsType` is set to `cifs` then parameter `defaultMountOptions` must include
-   CIFS username and password (`username=admin,password=123`).
-
 4. Create Kubernetes secret from the file:
    ```bash
    kubectl create secret generic nexentastor-csi-driver-block-config --from-file=deploy/kubernetes/nexentastor-csi-driver-block-config.yaml
@@ -175,10 +172,6 @@ parameters:
   #configName: nstor-slow            # specify exact NexentaStor appliance that you want to use to provision volumes.
   #volumeGroup: customPool/customvolumeGroup # to overwrite "defaultVolumeGroup" config property [pool/volumeGroup]
   #dataIp: 20.20.20.253              # to overwrite "defaultDataIp" config property
-  #mountFsType: nfs                  # to overwrite "defaultMountFsType" config property
-  #mountOptions: noatime             # to overwrite "defaultMountOptions" config property
-  #nfsAccessList: rw:10.3.196.93, ro:2.2.2.2, 3.3.3.3/10   # optional list to manage access by fqdn.
-
 ```
 
 #### Parameters
@@ -187,10 +180,7 @@ parameters:
 |----------------|--------------------------------------------------------|-------------------------------------------------------|
 | `volumeGroup`      | parent volumeGroup for driver's filesystems [pool/volumeGroup] | `customPool/customvolumeGroup`                            |
 | `dataIp`       | NexentaStor data IP or HA VIP for mounting shares      | `20.20.20.253`                                        |
-| `mountFsType`  | mount filesystem type [nfs, cifs](default: 'nfs')      | `cifs`                                                |
-| `mountOptions` | NFS/CIFS mount options: `mount -o ...`                 | NFS: `noatime`<br>CIFS: `username=admin,password=123` |
 | `configName`   | name of NexentaStor appliance from config file         | `nstor-ssd`                                        |
-| `nfsAccessList`| List of addresses to allow NFS access to. Format: `[accessMode]:[address]/[mask]`. `accessMode` and `mask` are optional, default mode is `rw`.| rw:10.3.196.93, ro:2.2.2.2, 3.3.3.3/10 |
 
 #### Example
 
@@ -221,8 +211,6 @@ mountOptions:                        # list of options for `mount -o ...` comman
 parameters:
   #volumeGroup: customPool/customvolumeGroup # to overwrite "defaultVolumeGroup" config property [pool/volumeGroup]
   #dataIp: 20.20.20.253              # to overwrite "defaultDataIp" config property
-  #mountFsType: nfs                  # to overwrite "defaultMountFsType" config property
-  #mountOptions: noatime             # to overwrite "defaultMountOptions" config property
 ```
 
 #### _PersistentVolume_ configuration

@@ -1,0 +1,1915 @@
+docker build \
+	--build-arg CSI_SANITY_VERSION_TAG=v2.1.0 \
+	-f Dockerfile.csi-sanity \
+	-t nexentastor-csi-driver-block-test-csi-sanity .
+Sending build context to Docker daemon  33.67MB
+Step 1/25 : FROM golang:1.13 as builder-csi-sanity
+ ---> 3a7408f53f79
+Step 2/25 : WORKDIR /go/src/github.com/kubernetes-csi/
+ ---> Using cache
+ ---> 0d033c97a106
+Step 3/25 : ARG CSI_SANITY_VERSION_TAG
+ ---> Using cache
+ ---> cb4b1e349c7b
+Step 4/25 : ENV CSI_SANITY_VERSION_TAG=$CSI_SANITY_VERSION_TAG
+ ---> Using cache
+ ---> 6e85415a98ab
+Step 5/25 : RUN git clone https://github.com/kubernetes-csi/csi-test.git &&    cd csi-test &&    git checkout -b ${CSI_SANITY_VERSION_TAG} ${CSI_SANITY_VERSION_TAG} &&    cd cmd/csi-sanity &&    make linux_amd64_dist &&    cp ./csi-sanity /csi-sanity
+ ---> Using cache
+ ---> cfd6b9007887
+Step 6/25 : FROM golang:1.13 as builder-driver
+ ---> 3a7408f53f79
+Step 7/25 : WORKDIR /go/src/github.com/Nexenta/nexentastor-csi-driver-block/
+ ---> Using cache
+ ---> ea5b579dfb38
+Step 8/25 : COPY . ./
+ ---> 4684a47db0ca
+Step 9/25 : RUN make build &&    cp ./bin/nexentastor-csi-driver-block /nexentastor-csi-driver-block
+ ---> Running in 1903c2a8bdb6
+mkdir -p ./bin
+env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/nexentastor-csi-driver-block -ldflags "-X github.com/Nexenta/nexentastor-csi-driver-block/pkg/driver.Version=sanity -X github.com/Nexenta/nexentastor-csi-driver-block/pkg/driver.Commit=68ed9cd -X github.com/Nexenta/nexentastor-csi-driver-block/pkg/driver.DateTime=2020-07-17_14:08:31" ./cmd
+[91mgo: downloading github.com/sirupsen/logrus v1.6.0
+[0m[91mgo: downloading github.com/cenkalti/backoff v2.2.1+incompatible
+[0m[91mgo: downloading golang.org/x/net v0.0.0-20200602114024-627f9648deb9
+[0m[91mgo: downloading google.golang.org/grpc v1.29.1
+[0m[91mgo: downloading github.com/golang/protobuf v1.3.3
+[0m[91mgo: downloading github.com/kubernetes-csi/csi-lib-utils v0.7.0
+[0m[91mgo: downloading github.com/antonfisher/nested-logrus-formatter v1.1.0
+[0m[91mgo: downloading github.com/container-storage-interface/spec v1.2.0
+go: downloading k8s.io/kubernetes v1.14.1
+[0m[91mgo: extracting github.com/sirupsen/logrus v1.6.0
+[0m[91mgo: extracting github.com/cenkalti/backoff v2.2.1+incompatible
+[0m[91mgo: extracting github.com/antonfisher/nested-logrus-formatter v1.1.0
+[0m[91mgo: downloading github.com/Nexenta/go-nexentastor v2.5.5+incompatible
+[0m[91mgo: downloading gopkg.in/yaml.v2 v2.3.0
+[0m[91mgo: extracting gopkg.in/yaml.v2 v2.3.0
+[0m[91mgo: downloading golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
+[0m[91mgo: extracting github.com/kubernetes-csi/csi-lib-utils v0.7.0
+[0m[91mgo: extracting github.com/golang/protobuf v1.3.3
+[0m[91mgo: extracting google.golang.org/grpc v1.29.1
+[0m[91mgo: downloading google.golang.org/genproto v0.0.0-20191220175831-5c49e3ecc1c1
+[0m[91mgo: extracting github.com/Nexenta/go-nexentastor v2.5.5+incompatible
+[0m[91mgo: extracting github.com/container-storage-interface/spec v1.2.0
+[0m[91mgo: extracting golang.org/x/net v0.0.0-20200602114024-627f9648deb9
+[0m[91mgo: downloading golang.org/x/text v0.3.2
+[0m[91mgo: extracting golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
+[0m[91mgo: extracting golang.org/x/text v0.3.2
+[0m[91mgo: extracting k8s.io/kubernetes v1.14.1
+[0m[91mgo: downloading k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
+[0m[91mgo: downloading k8s.io/klog v1.0.0
+[0m[91mgo: downloading k8s.io/apimachinery v0.17.1-beta.0
+[0m[91mgo: extracting k8s.io/klog v1.0.0
+[0m[91mgo: extracting k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
+[0m[91mgo: extracting k8s.io/apimachinery v0.17.1-beta.0
+[0m[91mgo: extracting google.golang.org/genproto v0.0.0-20191220175831-5c49e3ecc1c1
+[0m[91mgo: finding github.com/antonfisher/nested-logrus-formatter v1.1.0
+[0m[91mgo: finding github.com/sirupsen/logrus v1.6.0
+[0m[91mgo: finding gopkg.in/yaml.v2 v2.3.0
+[0m[91mgo: finding github.com/Nexenta/go-nexentastor v2.5.5+incompatible
+[0m[91mgo: finding github.com/cenkalti/backoff v2.2.1+incompatible
+[0m[91mgo: finding github.com/container-storage-interface/spec v1.2.0
+[0m[91mgo: finding github.com/golang/protobuf v1.3.3
+[0m[91mgo: finding github.com/kubernetes-csi/csi-lib-utils v0.7.0
+[0m[91mgo: finding golang.org/x/net v0.0.0-20200602114024-627f9648deb9
+[0m[91mgo: finding golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
+[0m[91mgo: finding google.golang.org/grpc v1.29.1
+[0m[91mgo: finding k8s.io/kubernetes v1.14.1
+[0m[91mgo: finding google.golang.org/genproto v0.0.0-20191220175831-5c49e3ecc1c1
+[0m[91mgo: finding k8s.io/apimachinery v0.17.1-beta.0
+[0m[91mgo: finding k8s.io/klog v1.0.0
+go: finding k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
+[0m[91mgo: finding golang.org/x/text v0.3.2
+[0mRemoving intermediate container 1903c2a8bdb6
+ ---> 87831d22c754
+Step 10/25 : FROM alpine:3.10
+ ---> af341ccd2df8
+Step 11/25 : WORKDIR /
+ ---> Using cache
+ ---> 53600ea9a518
+Step 12/25 : ENV SOCK="unix:///csi.sock"
+ ---> Using cache
+ ---> 8956b9fced86
+Step 13/25 : RUN apk update || true &&      apk add coreutils util-linux blkid     e2fsprogs bash kmod curl jq ca-certificates
+ ---> Using cache
+ ---> 83c4b0f25b13
+Step 14/25 : COPY --from=builder-csi-sanity /csi-sanity /
+ ---> Using cache
+ ---> 0a525005a1f2
+Step 15/25 : RUN mkdir /nexentastor-csi-driver-block
+ ---> Using cache
+ ---> 37f2b932ed5a
+Step 16/25 : COPY --from=builder-driver /nexentastor-csi-driver-block /nexentastor-csi-driver-block/
+ ---> 0f5baa2a639e
+Step 17/25 : RUN mkdir /lib64 &&    ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
+ ---> Running in 56f842b2eda8
+Removing intermediate container 56f842b2eda8
+ ---> 335b137efd43
+Step 18/25 : ADD chroot-host-wrapper.sh /nexentastor-csi-driver-block
+ ---> 336b7a506bfc
+Step 19/25 : RUN chmod 777 /nexentastor-csi-driver-block/chroot-host-wrapper.sh
+ ---> Running in 6209e4fa85f7
+Removing intermediate container 6209e4fa85f7
+ ---> d1c3dfd81936
+Step 20/25 : RUN    ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/blkid     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/ln     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/iscsiadm     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/lsscsi     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.ext3     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.ext4     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.xfs     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipath     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/rm     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipathd
+ ---> Running in 1358da7da4ae
+Removing intermediate container 1358da7da4ae
+ ---> 66f8b5de13ef
+Step 21/25 : ENV PATH="/nexentastor-csi-driver-block/:${PATH}"
+ ---> Running in 0b15a362ecc6
+Removing intermediate container 0b15a362ecc6
+ ---> b65352da3155
+Step 22/25 : COPY ./tests/csi-sanity/driver-config-csi-sanity.yaml /config/driver-config-csi-sanity.yaml
+ ---> 9555b3a30903
+Step 23/25 : RUN echo '/nexentastor-csi-driver-block/nexentastor-csi-driver-block --config-dir=/config --endpoint=${SOCK} --nodeid=local &' > /run-driver &&    chmod +x /run-driver
+ ---> Running in 52a447ee589c
+Removing intermediate container 52a447ee589c
+ ---> 2c65df3d516f
+Step 24/25 : RUN /csi-sanity -csi.version &&    /nexentastor-csi-driver-block/nexentastor-csi-driver-block --version
+ ---> Running in 93236424591a
+Version = v1.1.0-167-gc094d20-heads-v2.1.0
+PASS
+nexentastor-block-csi-driver.nexenta.com@sanity-68ed9cd (2020-07-17_14:08:31)
+Removing intermediate container 93236424591a
+ ---> 0514a80a8765
+Step 25/25 : ENTRYPOINT ["/bin/sh", "-c", "/run-driver && /csi-sanity --csi.endpoint=${SOCK} --csi.createpathcmdtimeout=180 --csi.removepathcmdtimeout=180 --ginkgo.skip 'pagination should detect volumes added between pages and accept tokens when the last volume from a page is deleted'"]
+ ---> Running in 6b9e82f9cbf1
+Removing intermediate container 6b9e82f9cbf1
+ ---> f8149e9bff00
+Successfully built f8149e9bff00
+Successfully tagged nexentastor-csi-driver-block-test-csi-sanity:latest
+docker run --network host --privileged=true --mount type=bind,source=/,target=/host,bind-propagation=rshared --mount type=bind,source=/tmp,target=/tmp,bind-propagation=rshared -i -e NOCOLORS= nexentastor-csi-driver-block-test-csi-sanity
+Jul 17 14:09:01.531[36m [INFO] [local] [Main] [0mRun driver with CLI options:
+Jul 17 14:09:01.531[36m [INFO] [local] [Main] [0m- Role:             ''
+Jul 17 14:09:01.531[36m [INFO] [local] [Main] [0m- Node ID:          'local'
+Jul 17 14:09:01.531[36m [INFO] [local] [Main] [0m- CSI endpoint:     'unix:///csi.sock'
+Jul 17 14:09:01.531[36m [INFO] [local] [Main] [0m- Config directory: '/config'
+Jul 17 14:09:01.531[33m [WARN] [local] [Main] [0mrole '' is not one of supported roles: [all controller node], default 'all' will be used
+Jul 17 14:09:01.532[36m [INFO] [local] [Main] [0mConfig file: '/config/driver-config-csi-sanity.yaml'
+Jul 17 14:09:01.532[36m [INFO] [local] [Main] [0mConfig file options:
+Jul 17 14:09:01.532[36m [INFO] [local] [Main] [0m  NexentaStor cluster: [nstor-box1]
+Jul 17 14:09:01.532[36m [INFO] [local] [Main] [0m  - NexentaStor address(es): https://10.3.199.29:8443
+Jul 17 14:09:01.532[36m [INFO] [local] [Main] [0m  - NexentaStor username: admin
+Jul 17 14:09:01.532[36m [INFO] [local] [Main] [0m  - Default dataset: qa/csiVolumeGroup
+Jul 17 14:09:01.532[36m [INFO] [local] [Main] [0m  - Default data IP: 10.3.199.29
+Jul 17 14:09:01.532[36m [INFO] [local] [Main] [0m  - Zone: 
+Jul 17 14:09:01.532[36m [INFO] [local] [Driver] [0mcreate new driver: nexentastor-block-csi-driver.nexenta.com@sanity-68ed9cd (2020-07-17_14:08:31)
+Running Suite: CSI Driver Test Suite
+====================================
+Random Seed: [1m1594994941[0m
+Will run [1m71[0m of [1m72[0m specs
+
+Jul 17 14:09:02.411[36m [INFO] [local] [Driver] [0mrun
+Jul 17 14:09:02.411[36m [INFO] [local] [Driver] [0mparsed unix domain socket: /csi.sock
+Jul 17 14:09:02.411[36m [INFO] [local] [IdentityServer] [0mcreate new IdentityServer...
+Jul 17 14:09:02.411[36m [INFO] [local] [ControllerServer] [0mcreate new ControllerServer...
+Jul 17 14:09:02.411[36m [INFO] [local] [ControllerServer] [0mResolver map: %+vmap[nstor-box1:{[https://10.3.199.29:8443] 0xc0001e83f0}]
+Jul 17 14:09:02.411[36m [INFO] [local] [NodeServer] [0mcreate new NodeServer...
+[1mSTEP[0m: connecting to CSI driver
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [1.002 seconds][0m
+ExpandVolume [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould fail if no volume id is given [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:2094[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc0003ae3f0>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+ExpandVolume [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould fail if no capacity range is given [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:2110[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc0003ae660>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+ExpandVolume [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould work [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:2123[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc0003ae8d0>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.001 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodeGetCapabilities [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:119[0m
+    should return appropriate capabilities
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:120[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0003aeb10>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.001 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodeGetInfo [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:144[0m
+    should return appropriate values
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:155[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000422120>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodePublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:171[0m
+    should fail when no volume id is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:172[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000422360>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodePublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:171[0m
+    should fail when no target path is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:186[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0004225a0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodePublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:171[0m
+    should fail when no volume capability is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:201[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0004227e0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodeUnpublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:218[0m
+    should fail when no volume id is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:219[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000422a20>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodeUnpublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:218[0m
+    should fail when no target path is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:231[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000422c60>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodeStageVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:246[0m
+    should fail when no volume id is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:259[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000422ea0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodeStageVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:246[0m
+    should fail when no staging target path is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:285[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0004230e0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodeStageVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:246[0m
+    should fail when no volume capability is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:311[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000423320>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodeUnstageVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:372[0m
+    should fail when no volume id is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:379[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000423560>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodeUnstageVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:372[0m
+    should fail when no staging target path is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:393[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0004237a0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodeGetVolumeStats [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:408[0m
+    should fail when no volume id is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:415[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0004239e0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodeGetVolumeStats [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:408[0m
+    should fail when no volume path is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:429[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000423c20>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodeGetVolumeStats [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:408[0m
+    should fail when volume is not found
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:443[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000423e60>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mNodeGetVolumeStats [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:408[0m
+    should fail when volume does not exist on the specified path
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:458[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000085c50>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Node Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould work [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/node.go:643[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc00010e750>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+CreateSnapshot [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould fail when no name is provided [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1939[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc00010ea80>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+CreateSnapshot [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould fail when no source volume id is provided [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1956[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc00010ec90>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+CreateSnapshot [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould not fail when requesting to create a snapshot with already existing name and same SourceVolumeId. [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1973[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc00010eea0>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+CreateSnapshot [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould fail when requesting to create a snapshot with already existing name and different SourceVolumeId. [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:2003[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc00010f0b0>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+CreateSnapshot [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould not fail when creating snapshot with maximum-length name [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:2038[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc00010f2c0>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mControllerGetCapabilities [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:118[0m
+    should return appropriate capabilities
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:119[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc00010f4a0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mGetCapacity [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:149[0m
+    should return capacity (no optional values added)
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:156[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc00010f6e0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mListVolumes [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:166[0m
+    should return appropriate values (no optional values added)
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:173[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc00010f950>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mListVolumes [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:166[0m
+    should fail when an invalid starting_token is passed
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:185[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc00010fb90>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mListVolumes [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:166[0m
+    check the presence of new volumes and absence of deleted ones in the volume list
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:200[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc00010fdd0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[36mS[0m[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+
+[90m------------------------------[0m
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mCreateVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:380[0m
+    should fail when no name is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:387[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000250090>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mCreateVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:380[0m
+    should fail when no volume capabilities are provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:403[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0002502d0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mCreateVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:380[0m
+    should return appropriate values SingleNodeWriter NoCapacity Type:Mount
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:421[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000250510>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mCreateVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:380[0m
+    should return appropriate values SingleNodeWriter WithCapacity 1Gi Type:Mount
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:463[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000250750>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mCreateVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:380[0m
+    should not fail when requesting to create a volume with already existing name and same capacity.
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:512[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000250990>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mCreateVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:380[0m
+    should fail when requesting to create a volume with already existing name and different capacity.
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:586[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000250c60>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mCreateVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:380[0m
+    should not fail when creating volume with maximum-length name
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:661[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000250f00>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.001 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mCreateVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:380[0m
+    should create volume from an existing source snapshot
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:712[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000251140>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.001 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mCreateVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:380[0m
+    should fail when the volume source snapshot is not found
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:760[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0002501b0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mCreateVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:380[0m
+    should create volume from an existing source volume
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:782[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000250450>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mCreateVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:380[0m
+    should fail when the volume source volume is not found
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:817[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0002506c0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mDeleteVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:840[0m
+    should fail when no volume id is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:847[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000250930>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mDeleteVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:840[0m
+    should succeed when an invalid volume id is used
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:862[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000250c30>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mDeleteVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:840[0m
+    should return appropriate values (no optional values added)
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:874[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000250f00>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mValidateVolumeCapabilities [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:919[0m
+    should fail when no volume id is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:920[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000251170>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mValidateVolumeCapabilities [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:919[0m
+    should fail when no volume capabilities are provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:934[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000251410>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mValidateVolumeCapabilities [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:919[0m
+    should return appropriate values (no optional values added)
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:989[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000251650>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mValidateVolumeCapabilities [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:919[0m
+    should fail when the requested volume does not exist
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1059[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0002518c0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mControllerPublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1086[0m
+    should fail when no volume id is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1093[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000251b30>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mControllerPublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1086[0m
+    should fail when no node id is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1108[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000251da0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mControllerPublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1086[0m
+    should fail when no volume capability is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1124[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000422030>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mControllerPublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1086[0m
+    should return appropriate values (no optional values added)
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1143[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0004222d0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mControllerPublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1086[0m
+    should fail when publishing more volumes than the node max attach limit
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1241[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000422540>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mControllerPublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1086[0m
+    should fail when the volume does not exist
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1283[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0004227b0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mControllerPublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1086[0m
+    should fail when the node does not exist
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1312[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000422a20>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mControllerPublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1086[0m
+    should fail when the volume is already published but is incompatible
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1382[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000422c90>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mControllerUnpublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1485[0m
+    should fail when no volume id is provided
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1492[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000422f00>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Controller Service [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mControllerUnpublishVolume [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1485[0m
+    should return appropriate values (no optional values added)
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1509[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000423170>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Identity Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mGetPluginCapabilities [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/identity.go:42[0m
+    should return appropriate capabilities
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/identity.go:43[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0004233e0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Identity Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mProbe [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/identity.go:75[0m
+    should return appropriate information
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/identity.go:76[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc0004235f0>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+Identity Service
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mGetPluginInfo [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/identity.go:95[0m
+    should return appropriate information
+    [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/identity.go:96[0m
+
+    [91mfailed to create target directory 
+    Unexpected error:
+        <*os.PathError | 0xc000423800>: {
+            Op: "mkdir",
+            Path: "/tmp/csi-mount",
+            Err: 0x11,
+        }
+        mkdir /tmp/csi-mount: file exists
+    occurred[0m
+
+    /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+ListSnapshots [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould return appropriate values (no optional values added) [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1623[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc000423a40>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+ListSnapshots [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould return snapshots that match the specified snapshot id [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1635[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc000423c80>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+ListSnapshots [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould return empty when the specified snapshot id does not exist [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1667[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc000423ec0>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+ListSnapshots [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould return snapshots that match the specified source volume id) [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1677[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc00010e6f0>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+ListSnapshots [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould return empty when the specified source volume id does not exist [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1710[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc00010ea20>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+ListSnapshots [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mcheck the presence of new snapshots in the snapshot list [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1720[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc00010ec90>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+ListSnapshots [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould return next token when a limited number of entries are requested [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1768[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc00010ef00>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+DeleteSnapshot [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould fail when no snapshot id is provided [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1876[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc00010f170>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+DeleteSnapshot [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould succeed when an invalid snapshot id is used [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1892[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc00010f440>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+[1mSTEP[0m: reusing connection to CSI driver at unix:///csi.sock
+[1mSTEP[0m: creating mount and staging directories
+[91m[1m• Failure in Spec Setup (BeforeEach) [0.000 seconds][0m
+DeleteSnapshot [Controller Server]
+[90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/tests.go:44[0m
+  [91m[1mshould return appropriate values (no optional values added) [BeforeEach][0m
+  [90m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/controller.go:1899[0m
+
+  [91mfailed to create target directory 
+  Unexpected error:
+      <*os.PathError | 0xc00010f680>: {
+          Op: "mkdir",
+          Path: "/tmp/csi-mount",
+          Err: 0x11,
+      }
+      mkdir /tmp/csi-mount: file exists
+  occurred[0m
+
+  /go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225
+[90m------------------------------[0m
+
+
+[91m[1mSummarizing 71 Failures:[0m
+
+[91m[1m[Fail] [0m[90mExpandVolume [Controller Server] [0m[91m[1m[BeforeEach] should fail if no volume id is given [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mExpandVolume [Controller Server] [0m[91m[1m[BeforeEach] should fail if no capacity range is given [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mExpandVolume [Controller Server] [0m[91m[1m[BeforeEach] should work [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodeGetCapabilities [0m[90mshould return appropriate capabilities [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodeGetInfo [0m[90mshould return appropriate values [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodePublishVolume [0m[90mshould fail when no volume id is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodePublishVolume [0m[90mshould fail when no target path is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodePublishVolume [0m[90mshould fail when no volume capability is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodeUnpublishVolume [0m[90mshould fail when no volume id is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodeUnpublishVolume [0m[90mshould fail when no target path is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodeStageVolume [0m[90mshould fail when no volume id is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodeStageVolume [0m[90mshould fail when no staging target path is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodeStageVolume [0m[90mshould fail when no volume capability is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodeUnstageVolume [0m[90mshould fail when no volume id is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodeUnstageVolume [0m[90mshould fail when no staging target path is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodeGetVolumeStats [0m[90mshould fail when no volume id is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodeGetVolumeStats [0m[90mshould fail when no volume path is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodeGetVolumeStats [0m[90mshould fail when volume is not found [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] NodeGetVolumeStats [0m[90mshould fail when volume does not exist on the specified path [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mNode Service [0m[91m[1m[BeforeEach] should work [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mCreateSnapshot [Controller Server] [0m[91m[1m[BeforeEach] should fail when no name is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mCreateSnapshot [Controller Server] [0m[91m[1m[BeforeEach] should fail when no source volume id is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mCreateSnapshot [Controller Server] [0m[91m[1m[BeforeEach] should not fail when requesting to create a snapshot with already existing name and same SourceVolumeId. [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mCreateSnapshot [Controller Server] [0m[91m[1m[BeforeEach] should fail when requesting to create a snapshot with already existing name and different SourceVolumeId. [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mCreateSnapshot [Controller Server] [0m[91m[1m[BeforeEach] should not fail when creating snapshot with maximum-length name [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ControllerGetCapabilities [0m[90mshould return appropriate capabilities [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] GetCapacity [0m[90mshould return capacity (no optional values added) [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ListVolumes [0m[90mshould return appropriate values (no optional values added) [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ListVolumes [0m[90mshould fail when an invalid starting_token is passed [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ListVolumes [0m[90mcheck the presence of new volumes and absence of deleted ones in the volume list [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] CreateVolume [0m[90mshould fail when no name is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] CreateVolume [0m[90mshould fail when no volume capabilities are provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] CreateVolume [0m[90mshould return appropriate values SingleNodeWriter NoCapacity Type:Mount [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] CreateVolume [0m[90mshould return appropriate values SingleNodeWriter WithCapacity 1Gi Type:Mount [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] CreateVolume [0m[90mshould not fail when requesting to create a volume with already existing name and same capacity. [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] CreateVolume [0m[90mshould fail when requesting to create a volume with already existing name and different capacity. [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] CreateVolume [0m[90mshould not fail when creating volume with maximum-length name [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] CreateVolume [0m[90mshould create volume from an existing source snapshot [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] CreateVolume [0m[90mshould fail when the volume source snapshot is not found [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] CreateVolume [0m[90mshould create volume from an existing source volume [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] CreateVolume [0m[90mshould fail when the volume source volume is not found [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] DeleteVolume [0m[90mshould fail when no volume id is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] DeleteVolume [0m[90mshould succeed when an invalid volume id is used [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] DeleteVolume [0m[90mshould return appropriate values (no optional values added) [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ValidateVolumeCapabilities [0m[90mshould fail when no volume id is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ValidateVolumeCapabilities [0m[90mshould fail when no volume capabilities are provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ValidateVolumeCapabilities [0m[90mshould return appropriate values (no optional values added) [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ValidateVolumeCapabilities [0m[90mshould fail when the requested volume does not exist [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ControllerPublishVolume [0m[90mshould fail when no volume id is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ControllerPublishVolume [0m[90mshould fail when no node id is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ControllerPublishVolume [0m[90mshould fail when no volume capability is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ControllerPublishVolume [0m[90mshould return appropriate values (no optional values added) [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ControllerPublishVolume [0m[90mshould fail when publishing more volumes than the node max attach limit [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ControllerPublishVolume [0m[90mshould fail when the volume does not exist [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ControllerPublishVolume [0m[90mshould fail when the node does not exist [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ControllerPublishVolume [0m[90mshould fail when the volume is already published but is incompatible [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ControllerUnpublishVolume [0m[90mshould fail when no volume id is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mController Service [Controller Server] [0m[91m[1m[BeforeEach] ControllerUnpublishVolume [0m[90mshould return appropriate values (no optional values added) [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mIdentity Service [0m[91m[1m[BeforeEach] GetPluginCapabilities [0m[90mshould return appropriate capabilities [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mIdentity Service [0m[91m[1m[BeforeEach] Probe [0m[90mshould return appropriate information [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mIdentity Service [0m[91m[1m[BeforeEach] GetPluginInfo [0m[90mshould return appropriate information [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mListSnapshots [Controller Server] [0m[91m[1m[BeforeEach] should return appropriate values (no optional values added) [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mListSnapshots [Controller Server] [0m[91m[1m[BeforeEach] should return snapshots that match the specified snapshot id [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mListSnapshots [Controller Server] [0m[91m[1m[BeforeEach] should return empty when the specified snapshot id does not exist [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mListSnapshots [Controller Server] [0m[91m[1m[BeforeEach] should return snapshots that match the specified source volume id) [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mListSnapshots [Controller Server] [0m[91m[1m[BeforeEach] should return empty when the specified source volume id does not exist [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mListSnapshots [Controller Server] [0m[91m[1m[BeforeEach] check the presence of new snapshots in the snapshot list [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mListSnapshots [Controller Server] [0m[91m[1m[BeforeEach] should return next token when a limited number of entries are requested [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mDeleteSnapshot [Controller Server] [0m[91m[1m[BeforeEach] should fail when no snapshot id is provided [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mDeleteSnapshot [Controller Server] [0m[91m[1m[BeforeEach] should succeed when an invalid snapshot id is used [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[91m[1m[Fail] [0m[90mDeleteSnapshot [Controller Server] [0m[91m[1m[BeforeEach] should return appropriate values (no optional values added) [0m
+[37m/go/src/github.com/kubernetes-csi/csi-test/pkg/sanity/sanity.go:225[0m
+
+[1m[91mRan 71 of 72 Specs in 1.035 seconds[0m
+[1m[91mFAIL![0m -- [32m[1m0 Passed[0m | [91m[1m71 Failed[0m | [33m[1m0 Pending[0m | [36m[1m1 Skipped[0m
+--- FAIL: TestSanity (1.04s)
+FAIL
+Makefile:130: recipe for target 'test-csi-sanity-container' failed
+make: *** [test-csi-sanity-container] Error 1
