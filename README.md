@@ -388,12 +388,12 @@ kubectl delete secret nexentastor-csi-driver-block-config
   ```
 - Driver logs
   ```bash
-  kubectl logs -f nexentastor-csi-controller-0 driver
-  kubectl logs -f $(kubectl get pods | awk '/nexentastor-csi-node/ {print $1;exit}') driver
+  kubectl logs --all-containers $(kubectl get pods | grep nexentastor-block-csi-controller | awk '{print $1}') -f
+  kubectl logs --all-containers $(kubectl get pods | grep nexentastor-block-csi-node | awk '{print $1}') -f
   ```
 - Show termination message in case driver failed to run:
   ```bash
-  kubectl get pod nexentastor-csi-controller-0 -o go-template="{{range .status.containerStatuses}}{{.lastState.terminated.message}}{{end}}"
+  kubectl get pod nexentastor-csi-block-controller-0 -o go-template="{{range .status.containerStatuses}}{{.lastState.terminated.message}}{{end}}"
   ```
 - Configure Docker to trust insecure registries:
   ```bash
