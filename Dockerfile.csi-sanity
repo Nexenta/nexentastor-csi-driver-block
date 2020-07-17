@@ -26,24 +26,41 @@ WORKDIR /
 # driver UNIX socket
 ENV SOCK="unix:///csi.sock"
 # install dependencies
-RUN apk update &&\
-    apk add --no-cache rpcbind nfs-utils
+RUN apk update || true &&  \
+    apk add coreutils util-linux blkid \
+    e2fsprogs bash kmod curl jq ca-certificates
+
+
 # copy csi-sanity from build container
 COPY --from=builder-csi-sanity /csi-sanity /
 # copy driver from build container
-COPY --from=builder-driver /nexentastor-csi-driver-block /
+RUN mkdir /nexentastor-csi-driver-block
+COPY --from=builder-driver /nexentastor-csi-driver-block /nexentastor-csi-driver-block/
+RUN mkdir /lib64 &&\
+    ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
+ADD chroot-host-wrapper.sh /nexentastor-csi-driver-block
+RUN chmod 777 /nexentastor-csi-driver-block/chroot-host-wrapper.sh
+RUN    ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/blkid \
+    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/ln \
+    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/iscsiadm \
+    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/lsscsi \
+    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.ext3 \
+    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.ext4 \
+    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.xfs \
+    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipath \
+    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/rm \
+    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipathd 
+ENV PATH="/nexentastor-csi-driver-block/:${PATH}"
 # copy driver config file
 COPY ./tests/csi-sanity/driver-config-csi-sanity.yaml /config/driver-config-csi-sanity.yaml
 # create mount direactory for tests
 # driver run script
-RUN echo '/nexentastor-csi-driver-block --config-dir=/config --endpoint=${SOCK} --nodeid=local &' > /run-driver &&\
+RUN echo '/nexentastor-csi-driver-block/nexentastor-csi-driver-block --config-dir=/config --endpoint=${SOCK} --nodeid=local &' > /run-driver &&\
     chmod +x /run-driver
 # details: https://stackoverflow.com/questions/34729748/installed-go-binary-not-found-in-path-on-alpine-linux-docker
-RUN mkdir /lib64 &&\
-    ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
 # versions
 RUN /csi-sanity -csi.version &&\
-    /nexentastor-csi-driver-block --version
+    /nexentastor-csi-driver-block/nexentastor-csi-driver-block --version
 # other csi-sanity options: --ginkgo.v -ginkgo.noColor
 #TODO remove "--ginkgo.skip" option after fixing volume paginatin by token:
 ENTRYPOINT ["/bin/sh", "-c", "/run-driver && /csi-sanity --csi.endpoint=${SOCK} --csi.createpathcmdtimeout=180 --csi.removepathcmdtimeout=180 --ginkgo.skip 'pagination should detect volumes added between pages and accept tokens when the last volume from a page is deleted'"]

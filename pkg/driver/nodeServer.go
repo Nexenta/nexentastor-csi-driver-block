@@ -530,6 +530,7 @@ func (s *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
     if err != nil {
         return nil, err
     }
+
     return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 

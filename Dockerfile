@@ -15,7 +15,7 @@ LABEL maintainer="Nexenta Systems, Inc."
 LABEL description="NexentaStor Block CSI Driver"
 LABEL io.k8s.description="NexentaStor Block CSI Driver"
 RUN apk update || true &&  \
-	apk add coreutils util-linux blkid nfs-utils \
+	apk add coreutils util-linux blkid \
 	e2fsprogs bash kmod curl jq ca-certificates
 
 RUN mkdir /nexentastor-csi-driver-block
