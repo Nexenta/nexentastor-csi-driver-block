@@ -3,7 +3,7 @@ module github.com/Nexenta/nexentastor-csi-driver-block
 go 1.13
 
 require (
-	github.com/Nexenta/go-nexentastor v2.5.5+incompatible
+	github.com/Nexenta/go-nexentastor v2.5.6+incompatible
 	github.com/antonfisher/nested-logrus-formatter v1.1.0
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/container-storage-interface/spec v1.2.0

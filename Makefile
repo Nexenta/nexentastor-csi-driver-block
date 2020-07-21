@@ -133,6 +133,7 @@ test-csi-sanity-container:
 		-t ${IMAGE_NAME}-test-csi-sanity .
 	docker run --network host --privileged=true --mount type=bind,source=/,target=/host,bind-propagation=rshared --mount type=bind,source=/tmp,target=/tmp,bind-propagation=rshared -i -e NOCOLORS=${NOCOLORS} ${IMAGE_NAME}-test-csi-sanity
 
+
 # run all tests (local registry image)
 .PHONY: test-all-local-image
 test-all-local-image: \
@@ -169,7 +170,7 @@ release:
 		1. New version will be based on current '${GIT_BRANCH}' git branch\n \
 		2. Driver container '${IMAGE_NAME}' will be built\n \
 		3. Login to hub.docker.com will be requested\n \
-		4. Driver version '${REGISTRY}/${IMAGE_NAME}:${VERSION}' will be pushed to hub.docker.com\n \
+		4. Driver version '${REGISTRY}/${IMAGE_NAME}:v${VERSION}' will be pushed to hub.docker.com\n \
 		5. CHANGELOG.md file will be updated\n \
 		6. Git tag 'v${VERSION}' will be created and pushed to the repository.\n\n \
 		Are you sure? [y/N]: "
@@ -180,14 +181,14 @@ release:
 	make container-push-remote
 	git add CHANGELOG.md
 	git commit -m "release v${VERSION}"
-	git push origin ${VERSION}
+	git push origin v${VERSION}
 	git tag v${VERSION}
 	git push --tags
 
 .PHONY: generate-changelog
 generate-changelog:
-	@echo "Release tag: ${VERSION}\n"
-	docker build -f ${DOCKER_FILE_PRE_RELEASE} -t ${DOCKER_IMAGE_PRE_RELEASE} --build-arg VERSION=${VERSION} .
+	@echo "Release tag: v${VERSION}\n"
+	docker build -f ${DOCKER_FILE_PRE_RELEASE} -t ${DOCKER_IMAGE_PRE_RELEASE} --build-arg VERSION=v${VERSION} .
 	-docker rm -f ${DOCKER_CONTAINER_PRE_RELEASE}
 	docker create --name ${DOCKER_CONTAINER_PRE_RELEASE} ${DOCKER_IMAGE_PRE_RELEASE}
 	docker cp \
