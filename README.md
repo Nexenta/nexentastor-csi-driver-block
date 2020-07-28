@@ -163,22 +163,21 @@ metadata:
   name: nexentastor-csi-driver-block-sc-nginx-dynamic
 provisioner: nexentastor-csi-driver.nexenta.com
 mountOptions:                        # list of options for `mount -o ...` command
-#  - noatime                         #
-#- matchLabelExpressions:            # use to following lines to configure topology by zones
+#- matchLabelExpressions:            # use the following lines to configure topology by zones
 #  - key: topology.kubernetes.io/zone
 #    values:
 #    - us-east
 parameters:
-  #configName: nstor-slow            # specify exact NexentaStor appliance that you want to use to provision volumes.
-  #volumeGroup: customPool/customvolumeGroup # to overwrite "defaultVolumeGroup" config property [pool/volumeGroup]
-  #dataIp: 20.20.20.253              # to overwrite "defaultDataIp" config property
+  #configName: nstor-slow                         # specify exact NexentaStor appliance that you want to use to provision volumes.
+  #volumeGroup: customPool/customvolumeGroup      # to overwrite "defaultVolumeGroup" config property [pool/volumeGroup]
+  #dataIp: 20.20.20.253                           # to overwrite "defaultDataIp" config property
 ```
 
 #### Parameters
 
 | Name           | Description                                            | Example                                               |
 |----------------|--------------------------------------------------------|-------------------------------------------------------|
-| `volumeGroup`      | parent volumeGroup for driver's filesystems [pool/volumeGroup] | `customPool/customvolumeGroup`                            |
+| `volumeGroup`  | parent volumeGroup for driver's filesystems [pool/volumeGroup] | `customPool/customvolumeGroup`                            |
 | `dataIp`       | NexentaStor data IP or HA VIP for mounting shares      | `20.20.20.253`                                        |
 | `configName`   | name of NexentaStor appliance from config file         | `nstor-ssd`                                        |
 
