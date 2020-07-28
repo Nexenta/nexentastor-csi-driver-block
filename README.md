@@ -128,7 +128,7 @@ change the following line in controller service config
 
 
 ```
-kind: StatefulSet
+kind: Deployment
 apiVersion: apps/v1
 metadata:
 name: nexentastor-block-csi-controller
