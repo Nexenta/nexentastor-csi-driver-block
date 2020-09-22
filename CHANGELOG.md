@@ -1,6 +1,10 @@
 
 <a name="vv1.0.1"></a>
-## [vv1.0.1](https://github.com/Nexenta/nexentastor-csi-driver/compare/v1.0.0...vv1.0.1) (2020-07-21)
+## [vv1.0.1](https://github.com/Nexenta/nexentastor-csi-driver/compare/v1.0.1...vv1.0.1) (0001-01-01)
+
+
+<a name="v1.0.1"></a>
+## [v1.0.1](https://github.com/Nexenta/nexentastor-csi-driver/compare/v1.0.0...v1.0.1) (2020-09-22)
 
 
 <a name="v1.0.0"></a>

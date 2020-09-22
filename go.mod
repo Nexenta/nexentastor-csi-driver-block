@@ -3,12 +3,13 @@ module github.com/Nexenta/nexentastor-csi-driver-block
 go 1.13
 
 require (
-	github.com/Nexenta/go-nexentastor v2.5.6+incompatible
+	github.com/Nexenta/go-nexentastor v2.5.62+incompatible
 	github.com/antonfisher/nested-logrus-formatter v1.1.0
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/container-storage-interface/spec v1.2.0
 	github.com/educlos/testrail v0.0.0-20200402224751-3ab3c62b1fdc // indirect
 	github.com/golang/protobuf v1.3.3
+	github.com/google/uuid v1.1.1
 	github.com/kubernetes-csi/csi-lib-utils v0.7.0
 	github.com/sirupsen/logrus v1.6.0
 	golang.org/x/net v0.0.0-20200602114024-627f9648deb9
