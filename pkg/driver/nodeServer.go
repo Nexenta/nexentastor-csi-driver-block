@@ -2,6 +2,7 @@ package driver
 
 import (
     "fmt"
+    "io/ioutil"
     "os"
     "os/exec"
     "path/filepath"
@@ -10,6 +11,7 @@ import (
     "time"
 
     "github.com/container-storage-interface/spec/lib/go/csi"
+    "github.com/google/uuid"
     "github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
     "github.com/sirupsen/logrus"
     "golang.org/x/net/context"
@@ -41,7 +43,8 @@ type CreateMappingParams struct {
 
 const (
     DefaultISCSIPort = "3260"
-    DefaultHostGroup = "all"
+    HostGroupPrefix = "csi"
+    PathToInitiatorName = "/host/etc/iscsi/initiatorname.iscsi"
 )
 
 
@@ -215,7 +218,10 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
         if cfg.DefaultHostGroup != "" {
             hostGroup = cfg.DefaultHostGroup
         } else {
-            hostGroup = DefaultHostGroup
+            hostGroup, err = s.CreateUpdateHostGroup(nsProvider)
+            if err != nil {
+                return nil, err
+            }
         }
     }
     targetGroup := volumeContext["TargetGroup"]
@@ -319,6 +325,57 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     }
     l.Infof("Device %s mounted to %s", devName, targetPath)
     return &csi.NodePublishVolumeResponse{}, nil
+}
+
+func (s *NodeServer) CreateUpdateHostGroup(nsProvider ns.ProviderInterface) (name string, err error) {
+    l := s.log.WithField("func", "CreateUpdateHostGroup()")
+    nodeIQN, err := s.GetNodeIQN()
+    if err != nil {
+        return name, err
+    }
+    hostGroups, err := nsProvider.GetHostGroups()
+    if err != nil {
+        return name, err
+    }
+    for _, group := range hostGroups {
+        for _, member := range group.Members {
+            if member == nodeIQN {
+                return group.Name, nil
+            }
+        }
+    }
+
+    hgUUID := uuid.New()
+    name = fmt.Sprintf("%s-%s", HostGroupPrefix, hgUUID)
+    l.Infof("name: %v, nodeIQN: %v", name, nodeIQN)
+    params := ns.CreateHostGroupParams{
+        Name: name,
+        Members: []string{nodeIQN},
+    }
+    err = nsProvider.CreateHostGroup(params)
+    if err != nil {
+        return name, err
+    }
+    l.Infof("Successfully created host group: %v with members [%v]", name, nodeIQN)
+    return name, nil
+}
+
+func (s *NodeServer) GetNodeIQN() (initiatorName string, err error) {
+    content, err := ioutil.ReadFile(PathToInitiatorName)
+    if err != nil {
+        return initiatorName, err
+    }
+
+    lines := strings.Split(string(content), "\n")
+    for _, line := range lines {
+        if strings.HasPrefix(line, "InitiatorName=") && len(line) > 0 {
+            initiatorName = strings.Split(line, "InitiatorName=")[1]
+        }
+    }
+    if initiatorName == "" {
+        return initiatorName, fmt.Errorf("Node's initiatorname must not be empty")
+    }
+    return initiatorName, nil
 }
 
 func (s *NodeServer) CreateISCSIMapping(params CreateMappingParams, nsProvider ns.ProviderInterface) error {

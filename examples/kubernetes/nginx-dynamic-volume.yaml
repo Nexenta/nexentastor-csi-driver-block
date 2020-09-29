@@ -59,7 +59,7 @@ spec:
           protocol: TCP
       # volumeDevices:
       volumeMounts:
-      #  - devicePath: /dev/sdc
+        # - devicePath: /dev/sdc
         - mountPath: /mountedDisk
           name: nexentastor-block-csi-driver-data
   volumes:

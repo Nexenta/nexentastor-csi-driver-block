@@ -13,7 +13,7 @@ nexentastor_map:
     defaultVolumeGroup: csiDriverPool/csiVolumeGroup            # default volume group for driver's volumes [pool/volumeGroup]
     defaultTargetGroup: tg1                                     # [required] NexentaStor iSCSI target group name
     defaultTarget: iqn.2005-07.com.nexenta:01:test              # [required] NexentaStor iSCSI target
-    defaultHostGroup: all                                       # [required] NexentaStor host group
+    # defaultHostGroup: all                                       # NexentaStor host group
 
   # nstor-box2:
   #   restIp: https://10.3.199.252:8443,https://10.3.199.253:8443 # [required] NexentaStor REST API endpoint(s)
