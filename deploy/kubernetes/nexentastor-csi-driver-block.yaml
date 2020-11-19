@@ -244,8 +244,8 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: driver
-          image: nexenta/nexentastor-csi-driver-block:v1.0.0
-          imagePullPolicy: Always
+          image: nexenta/nexentastor-csi-driver-block:master
+          imagePullPolicy: IfNotPresent
           args:
             - --nodeid=$(KUBE_NODE_NAME)
             - --endpoint=unix://csi/csi.sock
@@ -367,8 +367,8 @@ spec:
             capabilities:
               add: ['SYS_ADMIN']
             allowPrivilegeEscalation: true
-          image: nexenta/nexentastor-csi-driver-block:v1.0.0
-          imagePullPolicy: Always
+          image: nexenta/nexentastor-csi-driver-block:master
+          imagePullPolicy: IfNotPresent
           args:
             - --nodeid=$(KUBE_NODE_NAME)
             - --endpoint=unix://csi/csi.sock
@@ -383,9 +383,8 @@ spec:
               mountPath: /csi
             - name: secret
               mountPath: /config
-            - name: host
-              mountPath: /host
-              mountPropagation: Bidirectional
+            - name: dev
+              mountPath: /dev
             - name: pods-mount-dir
               mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
@@ -405,9 +404,9 @@ spec:
           hostPath:
             path: /var/lib/kubelet/pods
             type: Directory
-        - name: host
+        - name: dev
           hostPath:
-            path: /
+            path: /dev
             type: Directory
         - name: plugin-dir
           hostPath:

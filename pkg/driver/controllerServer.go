@@ -557,7 +557,7 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
     } else {
         targetGroup = cfg.DefaultTargetGroup
     }
-    
+
     res = &csi.CreateVolumeResponse{
         Volume: &csi.Volume{
             ContentSource: contentSource,

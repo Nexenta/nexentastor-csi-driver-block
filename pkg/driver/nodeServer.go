@@ -2,6 +2,7 @@ package driver
 
 import (
     "fmt"
+    "io/ioutil"
     "os"
     "os/exec"
     "path/filepath"
@@ -10,6 +11,7 @@ import (
     "time"
 
     "github.com/container-storage-interface/spec/lib/go/csi"
+    "github.com/google/uuid"
     "github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
     "github.com/sirupsen/logrus"
     "golang.org/x/net/context"
@@ -31,17 +33,23 @@ type NodeServer struct {
 }
 
 type CreateMappingParams struct {
-    Address     string
-    Target      string
     TargetGroup string
-    Port        string
     VolumePath  string
     HostGroup   string
 }
 
+type CreateTargetTgParams struct {
+    Address           string
+    Port              string
+    Target            string
+    ISCSITargetPrefix string
+}
+
 const (
+    DefaultISCSITargetPrefix = "iqn.2005-07.com.nexenta"
     DefaultISCSIPort = "3260"
-    DefaultHostGroup = "all"
+    HostGroupPrefix = "csi"
+    PathToInitiatorName = "/etc/iscsi/initiatorname.iscsi"
 )
 
 
@@ -131,11 +139,10 @@ func (s* NodeServer) ISCSILogInRescan(target, portal string) (error) {
 func (s *NodeServer) GetRealDeviceName(symLink string) (string, error) {
     l := s.log.WithField("func", "GetRealDeviceName()")
     l.Infof("Evaluating symLink: %s", symLink)
-    devName, err := filepath.EvalSymlinks(fmt.Sprintf("/host/%s", symLink))
+    devName, err := filepath.EvalSymlinks(symLink)
     if err != nil {
         return "", err
     }
-    devName = strings.TrimPrefix(devName, "/host")
     l.Infof("Device name is: %s", devName)
     return devName, err
 }
@@ -147,7 +154,7 @@ func (s *NodeServer) RemoveDevice(devName string) (error) {
         f   *os.File
         err error
     )
-    filename := fmt.Sprintf("/host/sys/block%s/device/delete", strings.TrimPrefix(devName, "/dev"))
+    filename := fmt.Sprintf("/sys/block%s/device/delete", strings.TrimPrefix(devName, "/dev"))
     if f, err = os.OpenFile(filename, os.O_APPEND | os.O_WRONLY, 0200); err != nil {
         l.Warnf("Could not open file %s for writing.", filename)
         return nil
@@ -167,6 +174,79 @@ func (s *NodeServer) RemoveDevice(devName string) (error) {
     l.Infof("Successfully deleted device: %s", devName)
     f.Close()
     return nil
+}
+
+// ResolveTargetGroup - find target with lowest lunmappings or create new one
+func (s *NodeServer) ResolveTargetGroup(params CreateTargetTgParams, nsProvider ns.ProviderInterface) (
+    target, targetGroup string,
+    err error,
+) {
+    targetGroups, err := nsProvider.GetTargetGroups()
+    if err != nil {
+        return target, targetGroup, nil
+    }
+    var minLuns int
+    var minTargetGroup string
+    for _, tg := range targetGroups {
+        if strings.HasPrefix(tg.Name, params.ISCSITargetPrefix) {
+            params := ns.GetLunMappingsParams{
+                TargetGroup: tg.Name,
+            }
+            luns, err := nsProvider.GetLunMappings(params)
+            if err != nil {
+                return target, targetGroup, nil
+            }
+            if minLuns == 0 || len(luns) < minLuns {
+                minTargetGroup = tg.Name
+            }
+        }
+    }
+    if minTargetGroup != "" {
+        target = fmt.Sprintf("%s-%s", params.ISCSITargetPrefix, minTargetGroup)
+        return target, minTargetGroup, err
+    } else {
+        return s.CreateNewTargetTg(params, nsProvider)
+    }
+}
+
+func (s *NodeServer) CreateNewTargetTg(params CreateTargetTgParams, nsProvider ns.ProviderInterface) (
+    target, targetGroup string,
+    err error,
+) {
+    l := s.log.WithField("func", "CreateNewTargetTg()")
+    l.Infof("params: '%+v'", params)
+    if params.Target == "" {
+        targetGroup = uuid.New().String()
+        target = fmt.Sprintf("%s:%s", params.ISCSITargetPrefix, targetGroup)
+    } else {
+        targetGroup = strings.TrimPrefix(target, params.ISCSITargetPrefix)
+        target = params.Target
+    }
+    portInt, err := strconv.Atoi(params.Port)
+    if err != nil {
+        l.Errorf("Could not convert port to int, port: %s, err: %s", params.Port, err.Error())
+        return target, targetGroup, err
+    }
+    portal := ns.Portal{
+        Address: params.Address,
+        Port: portInt,
+    }
+    createTargetParams := ns.CreateISCSITargetParams{
+        Name: target,
+        Portals: []ns.Portal{portal},
+    }
+
+    err = nsProvider.CreateISCSITarget(createTargetParams)
+    if err != nil {
+        return target, targetGroup, err
+    }
+
+    createTargetGroupParams := ns.CreateTargetGroupParams{
+        Name: targetGroup,
+        Members: []string{target},
+    }
+    err = nsProvider.CreateUpdateTargetGroup(createTargetGroupParams)
+    return target, targetGroup, err
 }
 
 // NodePublishVolume - mounts NS fs to the node
@@ -209,19 +289,7 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     if err != nil {
         return nil, err
     }
-    
-    hostGroup := volumeContext["HostGroup"]
-    if hostGroup == "" {
-        if cfg.DefaultHostGroup != "" {
-            hostGroup = cfg.DefaultHostGroup
-        } else {
-            hostGroup = DefaultHostGroup
-        }
-    }
-    targetGroup := volumeContext["TargetGroup"]
-    if targetGroup == "" {
-        targetGroup = cfg.DefaultTargetGroup
-    }
+
     port := volumeContext["iSCSIPort"]
     if port == "" {
         if cfg.DefaultISCSIPort != "" {
@@ -234,25 +302,56 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     if dataIP == "" {
         dataIP = cfg.DefaultDataIP
     }
-    target := volumeContext["Target"]
-    if target == "" {
-        target = cfg.DefaultTarget
-    }
-    portal := fmt.Sprintf("%s:%s", dataIP, port)
 
-    params := CreateMappingParams{
+    targetGroup := volumeContext["TargetGroup"]
+    target := volumeContext["Target"]
+    iSCSITargetPrefix := cfg.ISCSITargetPrefix
+    if iSCSITargetPrefix == "" {
+        iSCSITargetPrefix = DefaultISCSITargetPrefix
+    }   
+    params := CreateTargetTgParams{
         Address: dataIP,
-        Target: target,
-        TargetGroup: targetGroup,
         Port: port,
+        Target: target,
+        ISCSITargetPrefix: iSCSITargetPrefix,
+    }
+    if cfg.DynamicTargetLunAllocation == true {
+        target, targetGroup, err = s.ResolveTargetGroup(params, nsProvider)
+        if err != nil {
+            return nil, err
+        }
+    } else {
+        if target == "" {
+            target = cfg.DefaultTarget
+        }
+        if targetGroup == "" {
+            targetGroup = cfg.DefaultTargetGroup
+        }
+        target, targetGroup, err = s.CreateNewTargetTg(params, nsProvider)
+    }
+
+    hostGroup := volumeContext["HostGroup"]
+    if hostGroup == "" {
+        if cfg.DefaultHostGroup != "" {
+            hostGroup = cfg.DefaultHostGroup
+        } else {
+            hostGroup, err = s.CreateUpdateHostGroup(nsProvider)
+            if err != nil {
+                return nil, err
+            }
+        }
+    }
+    mappingParams := CreateMappingParams{
+        TargetGroup: targetGroup,
         VolumePath: volumePath,
         HostGroup: hostGroup,
     }
-    err = s.CreateISCSIMapping(params, nsProvider)
+    err = s.CreateISCSIMapping(mappingParams, nsProvider)
     if err != nil {
         return nil, err
     }
 
+    portal := fmt.Sprintf("%s:%s", dataIP, port)
     err = s.ISCSILogInRescan(target, portal)
     if err != nil {
         return nil, err
@@ -274,15 +373,22 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
         "/dev/disk/by-path/ip", portal,
         "iscsi", target, "lun", strconv.Itoa(lunNumber)}, "-")
     // check if device is visible, wait if not
-    found := false
     sleepTime := 100 * time.Millisecond
-    for ok := true; ok; ok = found {
-        if _, err := os.Stat(devByPath); os.IsNotExist(err) {
-            l.Infof("Device %s not found, sleep %s", devByPath, sleepTime)
-            time.Sleep(sleepTime)
-        } else {
-            found = true
+    counter := 1
+    for {
+        path, err := os.Stat(devByPath)
+
+        if err == nil {
+            l.Infof("Found device %s -> %+v", devByPath, path.Name)
+            break
+        } else if counter == 10 {
+            return nil, err
         }
+        l.Infof("Device %s not found, sleep %sms", devByPath, sleepTime)
+        increment := 200 * time.Millisecond
+        sleepTime += increment
+        time.Sleep(sleepTime)
+        counter += 1
     }
     devName, err := s.GetRealDeviceName(devByPath)
     if err != nil {
@@ -321,45 +427,66 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     return &csi.NodePublishVolumeResponse{}, nil
 }
 
+func (s *NodeServer) CreateUpdateHostGroup(nsProvider ns.ProviderInterface) (name string, err error) {
+    l := s.log.WithField("func", "CreateUpdateHostGroup()")
+    nodeIQN, err := s.GetNodeIQN()
+    if err != nil {
+        return name, err
+    }
+    hostGroups, err := nsProvider.GetHostGroups()
+    if err != nil {
+        return name, err
+    }
+    for _, group := range hostGroups {
+        for _, member := range group.Members {
+            if member == nodeIQN {
+                return group.Name, nil
+            }
+        }
+    }
+
+    hgUUID := uuid.New()
+    name = fmt.Sprintf("%s-%s", HostGroupPrefix, hgUUID)
+    l.Infof("name: %v, nodeIQN: %v", name, nodeIQN)
+    params := ns.CreateHostGroupParams{
+        Name: name,
+        Members: []string{nodeIQN},
+    }
+    err = nsProvider.CreateHostGroup(params)
+    if err != nil {
+        return name, err
+    }
+    l.Infof("Successfully created host group: %v with members [%v]", name, nodeIQN)
+    return name, nil
+}
+
+func (s *NodeServer) GetNodeIQN() (initiatorName string, err error) {
+    content, err := ioutil.ReadFile(PathToInitiatorName)
+    if err != nil {
+        return initiatorName, err
+    }
+
+    lines := strings.Split(string(content), "\n")
+    for _, line := range lines {
+        if strings.HasPrefix(line, "InitiatorName=") && len(line) > 0 {
+            initiatorName = strings.Split(line, "InitiatorName=")[1]
+        }
+    }
+    if initiatorName == "" {
+        return initiatorName, fmt.Errorf("Node's initiatorname must not be empty")
+    }
+    return initiatorName, nil
+}
+
 func (s *NodeServer) CreateISCSIMapping(params CreateMappingParams, nsProvider ns.ProviderInterface) error {
     l := s.log.WithField("func", "CreateISCSIMapping()")
     l.Infof("Creating iSCSI mapping with params: %+v", params)
 
-    iSCSIParams := ns.CreateISCSITargetParams{
-        Name: params.Target,
-    }
-    portInt, err := strconv.Atoi(params.Port)
-    if err != nil {
-        l.Errorf("Could not convert port to int, port: %s, err: %s", params.Port, err.Error())
-        return err
-    }
-    iSCSIParams.Portals = append(iSCSIParams.Portals, ns.Portal{
-        Address: params.Address,
-        Port: portInt,
-    })
-    err = nsProvider.CreateISCSITarget(iSCSIParams)
-    if err != nil {
-        return err
-    }
-
-    createTargetGroupParams := ns.CreateTargetGroupParams{
-        Name: params.TargetGroup,
-        Members: []string{params.Target},
-    }
-    err = nsProvider.CreateUpdateTargetGroup(createTargetGroupParams)
-    if err != nil {
-        return err
-    }
-
-    err = nsProvider.CreateLunMapping(ns.CreateLunMappingParams{
+    return nsProvider.CreateLunMapping(ns.CreateLunMappingParams{
         Volume: params.VolumePath,
         TargetGroup: params.TargetGroup,
         HostGroup: params.HostGroup,
     })
-    if err != nil {
-        return err
-    }
-    return nil
 }
 
 func (s *NodeServer) mountVolume(devName, targetPath, fsType string, req *csi.NodePublishVolumeRequest) error {
@@ -396,7 +523,7 @@ func (s *NodeServer) mountVolume(devName, targetPath, fsType string, req *csi.No
     }
 
     l.Infof("target %v, fstype %v, readonly %v, mountOptions %v", targetPath, fsType, readOnly, mountOptions)
-    err = mounter.Mount(fmt.Sprintf("/host%s", devName), targetPath, fsType, []string{})
+    err = mounter.Mount(devName, targetPath, fsType, []string{})
     if err != nil {
         if os.IsPermission(err) {
             l.Errorf("Failed to mount device %s. Error: %v", devName, err)
@@ -496,7 +623,7 @@ func (s *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
     }
 
     getLunResp, err := nsProvider.GetLunMapping(volumePath)
-    if err != nil{
+    if err != nil {
         if !ns.IsNotExistNefError(err) {
             return nil, err
         } else {
@@ -516,8 +643,13 @@ func (s *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
     }
     dataIP := cfg.DefaultDataIP
     portal := fmt.Sprintf("%s:%s", dataIP, port)
-    target := cfg.DefaultTarget
     lunNumber := getLunResp.Lun
+    targetGroup := getLunResp.TargetGroup
+    getTgResp, err := nsProvider.GetTargetGroup(targetGroup)
+    if err != nil {
+        return nil, err
+    }
+    target := getTgResp.Members[0]
     devByPath := strings.Join([]string{
         "/dev/disk/by-path/ip", portal,
         "iscsi", target, "lun", strconv.Itoa(lunNumber)}, "-")

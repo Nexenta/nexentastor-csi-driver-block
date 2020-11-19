@@ -1,67 +1,68 @@
-# csi-sanity build container
-FROM golang:1.13 as builder-csi-sanity
-WORKDIR /go/src/github.com/kubernetes-csi/
-# csi-sanity versions: https://github.com/kubernetes-csi/csi-test/releases
-ARG CSI_SANITY_VERSION_TAG
-ENV CSI_SANITY_VERSION_TAG=$CSI_SANITY_VERSION_TAG
-RUN git clone https://github.com/kubernetes-csi/csi-test.git &&\
-    cd csi-test &&\
-    git checkout -b ${CSI_SANITY_VERSION_TAG} ${CSI_SANITY_VERSION_TAG} &&\
-    cd cmd/csi-sanity &&\
-    make linux_amd64_dist &&\
-    cp ./csi-sanity /csi-sanity
+ARG BASE_IMAGE
+ARG BUILD_IMAGE
 
+FROM $BASE_IMAGE as builder-iscsi
+ARG OPEN_ISCSI_VERSION
+ARG OPEN_ISCSI_NAMESPACE
+RUN apk add alpine-sdk sudo git
+RUN abuild-keygen -n -a -i -q && \
+    git clone git://git.alpinelinux.org/aports && \
+    cd aports/main/open-iscsi && \
+    sed -i -e "s:^pkgrel=[0-9]*$:pkgrel=$OPEN_ISCSI_VERSION:" \
+           -e "/build/a sed -i s:ISCSIADM_ABSTRACT_NAMESPACE:$OPEN_ISCSI_NAMESPACE: usr/mgmt_ipc.h" APKBUILD && \
+    abuild -F -r -q
 
-# driver build container
-FROM golang:1.13 as builder-driver
-WORKDIR /go/src/github.com/Nexenta/nexentastor-csi-driver-block/
-COPY . ./
-RUN make build &&\
-    cp ./bin/nexentastor-csi-driver-block /nexentastor-csi-driver-block
+FROM $BUILD_IMAGE as builder-sanity
+ARG TOP_DIR
+ARG SANITY_VERSION
+ENV GOPATH $TOP_DIR
+ENV CGO_ENABLED 0
+WORKDIR $GOPATH/src/github.com/kubernetes-csi
+RUN apk add --no-cache git make
+RUN git clone https://github.com/kubernetes-csi/csi-test.git && \
+    cd csi-test && \
+    git checkout -b $SANITY_VERSION $SANITY_VERSION && \
+    cd cmd/csi-sanity && \
+    make install
 
+FROM $BUILD_IMAGE as builder-driver
+ARG TOP_DIR
+ARG GIT_CONFIG
+ARG GIT_TOKEN
+ARG DRIVER_MODULE
+ARG DRIVER_VERSION
+ARG DRIVER_PATH
+ENV GOPATH $TOP_DIR
+WORKDIR $GOPATH/src/$DRIVER_MODULE
+COPY . .
+RUN apk add --no-cache git make
+RUN echo "$GIT_CONFIG" | base64 -d >$HOME/.gitconfig && \
+    echo "$GIT_TOKEN" | base64 -d >$HOME/.git-credentials && \
+    make DRIVER_PATH=$DRIVER_PATH DRIVER_VERSION=$DRIVER_VERSION build
 
-# run driver and csi-sanity tests
-FROM alpine:3.10
-WORKDIR /
-# driver UNIX socket
-ENV SOCK="unix:///csi.sock"
-# install dependencies
-RUN apk update || true &&  \
-    apk add coreutils util-linux blkid \
-    e2fsprogs bash kmod curl jq ca-certificates
-
-
-# copy csi-sanity from build container
-COPY --from=builder-csi-sanity /csi-sanity /
-# copy driver from build container
-RUN mkdir /nexentastor-csi-driver-block
-COPY --from=builder-driver /nexentastor-csi-driver-block /nexentastor-csi-driver-block/
-RUN mkdir /lib64 &&\
-    ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
-ADD chroot-host-wrapper.sh /nexentastor-csi-driver-block
-RUN chmod 777 /nexentastor-csi-driver-block/chroot-host-wrapper.sh
-RUN    ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/blkid \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/ln \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/iscsiadm \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/lsscsi \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.ext3 \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.ext4 \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.xfs \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipath \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/rm \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipathd 
-ENV PATH="/nexentastor-csi-driver-block/:${PATH}"
-# copy driver config file
-COPY ./tests/csi-sanity/driver-config-csi-sanity.yaml /config/driver-config-csi-sanity.yaml
-# create mount direactory for tests
-# driver run script
-RUN echo '/nexentastor-csi-driver-block/nexentastor-csi-driver-block --config-dir=/config --endpoint=${SOCK} --nodeid=local &' > /run-driver &&\
-    chmod +x /run-driver
-# details: https://stackoverflow.com/questions/34729748/installed-go-binary-not-found-in-path-on-alpine-linux-docker
-# versions
-RUN /csi-sanity -csi.version &&\
-    /nexentastor-csi-driver-block/nexentastor-csi-driver-block --version
-# other csi-sanity options: --ginkgo.v -ginkgo.noColor
-#TODO remove "--ginkgo.skip" option after fixing volume paginatin by token:
-ENTRYPOINT ["/bin/sh", "-c", "/run-driver && /csi-sanity --csi.endpoint=${SOCK} --csi.createpathcmdtimeout=180 --csi.removepathcmdtimeout=180 --ginkgo.skip 'pagination should detect volumes added between pages and accept tokens when the last volume from a page is deleted'"]
-#ENTRYPOINT ["/bin/sh", "-c", "/run-driver && /csi-sanity --csi.endpoint=${SOCK} --csi.createpathcmdtimeout=180 --csi.removepathcmdtimeout=180]
+FROM $BASE_IMAGE
+ARG TOP_DIR
+ARG BIN_DIR
+ARG ETC_DIR
+ARG DRIVER_PATH
+ARG OPEN_ISCSI_IQN
+ENV GOPATH $TOP_DIR
+ENV SOCKET="unix:///csi.sock"
+COPY --from=builder-iscsi /root/.abuild/*.pub /etc/apk/keys
+COPY --from=builder-iscsi /root/packages /root/packages
+RUN echo /root/packages/main >>/etc/apk/repositories
+RUN apk add --no-cache open-iscsi e2fsprogs xfsprogs blkid
+RUN mkdir -p $BIN_DIR $ETC_DIR
+COPY --from=builder-sanity $GOPATH/bin/csi-sanity $BIN_DIR
+COPY --from=builder-driver $DRIVER_PATH $DRIVER_PATH
+COPY tests/csi-sanity/driver-config-csi-sanity.yaml $ETC_DIR/driver-config-csi-sanity.yaml
+RUN $BIN_DIR/csi-sanity -version && $DRIVER_PATH -version
+RUN echo '#!/bin/sh -exu' >/init.sh
+RUN echo 'mkdir -p /run/lock/iscsi' >>/init.sh
+RUN echo "/sbin/iscsi-iname -p $OPEN_ISCSI_IQN | sed s:^:InitiatorName=: >/etc/iscsi/initiatorname.iscsi" >>/init.sh
+RUN echo '/bin/cat /etc/iscsi/initiatorname.iscsi' >>/init.sh
+RUN echo '/sbin/iscsid &' >>/init.sh
+RUN echo "$DRIVER_PATH --config-dir=$ETC_DIR --endpoint=$SOCKET --nodeid=local &" >>/init.sh
+RUN echo "$BIN_DIR/csi-sanity --csi.endpoint=$SOCKET --csi.createpathcmdtimeout=180s --csi.removepathcmdtimeout=180s" >>/init.sh
+RUN chmod +x /init.sh && cat /init.sh
+ENTRYPOINT ["/init.sh"]

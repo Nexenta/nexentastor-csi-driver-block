@@ -25,16 +25,18 @@ type Config struct {
 }
 
 type NsData struct {
-    Address             string `yaml:"restIp"`
-    Username            string `yaml:"username"`
-    Password            string `yaml:"password"`
-    Zone                string `yaml: "zone"`
-    DefaultVolumeGroup  string `yaml:"defaultVolumeGroup,omitempty"`
-    DefaultTargetGroup  string `yaml:"defaultTargetGroup,omitempty"`
-    DefaultTarget       string `yaml:"defaultTarget,omitempty"`
-    DefaultHostGroup    string `yaml:"defaultHostGroup,omitempty"`
-    DefaultISCSIPort    string `yaml:"defaultiSCSIPort,omitempty"`
-    DefaultDataIP       string `yaml:"defaultDataIp,omitempty"`
+    Address                     string `yaml:"restIp"`
+    Username                    string `yaml:"username"`
+    Password                    string `yaml:"password"`
+    Zone                        string `yaml: "zone"`
+    DefaultVolumeGroup          string `yaml:"defaultVolumeGroup,omitempty"`
+    DefaultTargetGroup          string `yaml:"defaultTargetGroup,omitempty"`
+    DefaultTarget               string `yaml:"defaultTarget,omitempty"`
+    DefaultHostGroup            string `yaml:"defaultHostGroup,omitempty"`
+    DefaultISCSIPort            string `yaml:"defaultiSCSIPort,omitempty"`
+    DefaultDataIP               string `yaml:"defaultDataIp,omitempty"`
+    ISCSITargetPrefix           string `yaml:"iSCSITargetPrefix,omitempty"`
+    DynamicTargetLunAllocation  bool   `yaml:"dynamicTargetLunAllocation" default:"true"`
 }
 
 // GetFilePath - get filepath of found config file

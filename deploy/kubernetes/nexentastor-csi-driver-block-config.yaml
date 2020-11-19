@@ -6,14 +6,16 @@
 
 nexentastor_map:
   nstor-box1:
-    restIp: https://10.3.199.252:8443,https://10.3.199.253:8443 # [required] NexentaStor REST API endpoint(s)
+    # restIp: https://10.3.199.252:8443,https://10.3.199.253:8443 # [required] NexentaStor REST API endpoint(s)
+    restIp: https://192.168.211.128:8443                          # [required] NexentaStor REST API endpoint(s)
     username: admin                                             # [required] NexentaStor REST API username
     password: Nexenta@1                                         # [required] NexentaStor REST API password
-    defaultDataIp: 10.3.199.245                                 # default NexentaStor data IP or HA VIP
-    defaultVolumeGroup: csiDriverPool/csiVolumeGroup            # default volume group for driver's volumes [pool/volumeGroup]
-    defaultTargetGroup: tg1                                     # [required] NexentaStor iSCSI target group name
-    defaultTarget: iqn.2005-07.com.nexenta:01:test              # [required] NexentaStor iSCSI target
-    defaultHostGroup: all                                       # [required] NexentaStor host group
+    defaultDataIp: 192.168.211.128                                # default NexentaStor data IP or HA VIP
+    defaultVolumeGroup: testPool/csiVolumeGroup            # default volume group for driver's volumes [pool/volumeGroup]
+    dynamicTargetLunAllocation: true
+    # defaultTargetGroup: tg1                                     # [required] NexentaStor iSCSI target group name
+    # defaultTarget: iqn.2005-07.com.nexenta:01:test              # [required] NexentaStor iSCSI target
+    # defaultHostGroup: all                                       # NexentaStor host group
 
   # nstor-box2:
   #   restIp: https://10.3.199.252:8443,https://10.3.199.253:8443 # [required] NexentaStor REST API endpoint(s)

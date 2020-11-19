@@ -1,40 +1,54 @@
-# build container
-FROM golang:1.13 as builder
-WORKDIR /go/src/github.com/Nexenta/nexentastor-csi-driver-block/
-COPY . ./
-ARG VERSION
-ENV VERSION=$VERSION
-RUN make build &&\
-    cp ./bin/nexentastor-csi-driver-block /
+ARG BASE_IMAGE
+ARG BUILD_IMAGE
 
+FROM $BASE_IMAGE as builder-iscsi
+ARG OPEN_ISCSI_VERSION
+ARG OPEN_ISCSI_NAMESPACE
+RUN apk add alpine-sdk sudo git
+RUN abuild-keygen -n -a -i -q && \
+    git clone git://git.alpinelinux.org/aports && \
+    cd aports/main/open-iscsi && \
+    sed -i -e "s:^pkgrel=[0-9]*$:pkgrel=$OPEN_ISCSI_VERSION:" \
+           -e "/build/a sed -i s:ISCSIADM_ABSTRACT_NAMESPACE:$OPEN_ISCSI_NAMESPACE: usr/mgmt_ipc.h" APKBUILD && \
+    abuild -F -r -q
 
-# driver container
-FROM alpine:3.10
-LABEL name="nexentastor-block-csi-driver"
-LABEL maintainer="Nexenta Systems, Inc."
-LABEL description="NexentaStor Block CSI Driver"
-LABEL io.k8s.description="NexentaStor Block CSI Driver"
-RUN apk update || true &&  \
-	apk add coreutils util-linux blkid \
-	e2fsprogs bash kmod curl jq ca-certificates
+FROM $BUILD_IMAGE as builder-driver
+ARG TOP_DIR
+ARG GIT_CONFIG
+ARG GIT_TOKEN
+ARG DRIVER_NAME
+ARG DRIVER_MODULE
+ARG DRIVER_VERSION
+ARG DRIVER_PATH
+ENV GOPATH $TOP_DIR
+WORKDIR $GOPATH/src/$DRIVER_MODULE
+COPY . .
+RUN apk add --no-cache git make
+RUN echo "$GIT_CONFIG" | base64 -d >$HOME/.gitconfig && \
+    echo "$GIT_TOKEN" | base64 -d >$HOME/.git-credentials && \
+    make DRIVER_PATH=$DRIVER_PATH DRIVER_VERSION=$DRIVER_VERSION build
 
-RUN mkdir /nexentastor-csi-driver-block
-RUN mkdir -p /etc/ && mkdir -p /config/
-COPY --from=builder /nexentastor-csi-driver-block /nexentastor-csi-driver-block/
-RUN /nexentastor-csi-driver-block/nexentastor-csi-driver-block --version
-
-ADD chroot-host-wrapper.sh /nexentastor-csi-driver-block
-
-RUN chmod 777 /nexentastor-csi-driver-block/chroot-host-wrapper.sh
-RUN    ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/blkid \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/ln \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/iscsiadm \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/lsscsi \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.ext3 \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.ext4 \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.xfs \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipath \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipathd 
-
-ENV PATH="/nexentastor-csi-driver-block/:${PATH}"
-ENTRYPOINT ["/nexentastor-csi-driver-block/nexentastor-csi-driver-block"]
+FROM $BASE_IMAGE
+ARG BIN_DIR
+ARG ETC_DIR
+ARG DRIVER_PATH
+ARG OPEN_ISCSI_IQN
+LABEL name=$DRIVER_NAME
+LABEL maintainer="akhodos@tintri.com"
+LABEL description="NexentaStor CSI Block Driver"
+LABEL io.k8s.description="NexentaStor CSI Block Driver"
+COPY --from=builder-iscsi /root/.abuild/*.pub /etc/apk/keys
+COPY --from=builder-iscsi /root/packages /root/packages
+RUN echo /root/packages/main >>/etc/apk/repositories
+RUN apk add --no-cache open-iscsi e2fsprogs xfsprogs blkid
+RUN mkdir -p $BIN_DIR $ETC_DIR
+COPY --from=builder-driver $DRIVER_PATH $DRIVER_PATH
+RUN $DRIVER_PATH --version
+RUN echo '#!/bin/sh -exu' >/init.sh
+RUN echo 'mkdir -p /run/lock/iscsi' >>/init.sh
+RUN echo "/sbin/iscsi-iname -p $OPEN_ISCSI_IQN | sed s:^:InitiatorName=: >/etc/iscsi/initiatorname.iscsi" >>/init.sh
+RUN echo '/bin/cat /etc/iscsi/initiatorname.iscsi' >>/init.sh
+RUN echo '/sbin/iscsid' >>/init.sh
+RUN echo "$DRIVER_PATH" '"$@"' >>/init.sh
+RUN chmod +x /init.sh && cat /init.sh
+ENTRYPOINT ["/init.sh"]
