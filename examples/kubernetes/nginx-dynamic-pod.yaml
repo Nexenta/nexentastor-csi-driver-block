@@ -10,8 +10,10 @@ spec:
       ports:
         - containerPort: 80
           protocol: TCP
-      volumeDevices:
-        - devicePath: /dev/sdd
+      # volumeDevices:
+      volumeMounts:
+        - mountPath: /mntDisk
+        # - devicePath: /dev/sdd
           name: nexentastor-block-csi-driver-data
   volumes:
     - name: nexentastor-block-csi-driver-data

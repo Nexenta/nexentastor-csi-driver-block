@@ -1,22 +1,22 @@
 nexentastor_map:
     nstor-box1:
-      restIp: https://10.3.199.189:8443
+      restIp: https://10.3.199.28:8443
       username: admin
       password: Nexenta@1
-      defaultDataIp: 10.3.199.189
-      defaultVolumeGroup: csiDriverPool/csiVolumeGroup
+      defaultDataIp: 10.3.199.28
+      defaultVolumeGroup: pool1/csiVolumeGroup
       defaultTargetGroup: tg01
       defaultTarget: iqn.2005-07.com.nexenta:01:test
       defaultHostGroup: all
       zone: zone-1
     nstor-box2:
-      restIp: https://10.3.199.197:8443
+      restIp: https://10.3.199.190:8443,https://10.3.199.191:8443
       username: admin
       password: Nexenta@1
-      defaultDataIp: 10.3.199.197
-      defaultVolumeGroup: csiDriverPool/csiVolumeGroup
-      defaultTargetGroup: tg01
-      defaultTarget: iqn.2005-07.com.nexenta:01:test
+      defaultDataIp: 10.3.199.192
+      defaultVolumeGroup: qa/csiVolumeGroup
+      defaultTargetGroup: tg02
+      defaultTarget: iqn.2005-07.com.nexenta:02:test
       defaultHostGroup: all
       zone: zone-2
 debug: false
