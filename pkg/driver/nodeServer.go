@@ -607,9 +607,9 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
             if err != nil {
                 return nil, err
             }
-        } else if deviceFS != fsType {
+        } else if fsType != "" && deviceFS != fsType {
             return nil, fmt.Errorf(
-                "Volume %s is already formatted in %s, requested: %s,", volumeID, deviceFS, fsType)
+                "Volume %s is already formatted in %s, requested: %s", volumeID, deviceFS, fsType)
         }
 
         mountOptions := []string{"bind"}
