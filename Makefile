@@ -3,9 +3,33 @@
 # Test options to be set before run tests:
 # NOCOLOR=1                # disable colors
 # - TEST_K8S_IP=10.3.199.250 # e2e k8s tests
-#
 
-DRIVER_NAME = nexentastor-csi-driver-block
+VENDOR ?= nexentastor
+TOP_DIR ?= /go
+OPT_DIR ?= /opt/${VENDOR}
+BIN_DIR ?= ${OPT_DIR}/bin
+ETC_DIR ?= ${OPT_DIR}/etc
+DRIVER_NAME ?= ${VENDOR}-csi-driver-block
+DRIVER_PATH ?= bin/${DRIVER_NAME}
+
+BASE_IMAGE ?= alpine:3.12
+BUILD_IMAGE ?= golang:alpine3.12
+
+GIT_CONFIG ?= $(shell base64 -w 0 $$HOME/.gitconfig)
+GIT_TOKEN ?= $(shell base64 -w 0 $$HOME/.git-credentials)
+DRIVER_BRANCH = $(shell git rev-parse --abbrev-ref HEAD | sed -e "s/.*\\///")
+DRIVER_TAG = $(shell git describe --tags)
+DRIVER_MODULE ?= $(shell awk '/^module/{print $$NF}' go.mod)
+DRIVER_VERSION ?= $(if $(subst HEAD,,${DRIVER_BRANCH}),$(DRIVER_BRANCH),$(DRIVER_TAG))
+DRIVER_COMMIT ?= $(shell git rev-parse HEAD | cut -c 1-7)
+DATETIME ?= $(shell date +'%F_%T')
+UPPER_VERSION ?= $(shell echo $(DRIVER_VERSION) | tr '[:lower:]' '[:upper:]')
+UPPER_COMMIT ?= $(shell echo $(DRIVER_COMMIT) | tr '[:lower:]' '[:upper:]')
+
+OPEN_ISCSI_IQN ?= iqn.2005-07.com.nexenta:${DRIVER_NAME}
+OPEN_ISCSI_VERSION ?= 128
+OPEN_ISCSI_NAMESPACE ?= ISCSIADM_NAMESPACE_${UPPER_VERSION}_${UPPER_COMMIT}
+
 IMAGE_NAME ?= ${DRIVER_NAME}
 
 DOCKER_FILE = Dockerfile
@@ -14,6 +38,19 @@ DOCKER_FILE_TEST_CSI_SANITY = Dockerfile.csi-sanity
 DOCKER_FILE_PRE_RELEASE = Dockerfile.pre-release
 DOCKER_IMAGE_PRE_RELEASE = nexentastor-csi-driver-block-pre-release
 DOCKER_CONTAINER_PRE_RELEASE = ${DOCKER_IMAGE_PRE_RELEASE}-container
+DOCKER_ARGS = --build-arg BUILD_IMAGE=${BUILD_IMAGE} \
+              --build-arg BASE_IMAGE=${BASE_IMAGE} \
+              --build-arg BIN_DIR=${BIN_DIR} \
+              --build-arg TOP_DIR=${TOP_DIR} \
+              --build-arg ETC_DIR=${ETC_DIR} \
+              --build-arg DRIVER_PATH=${BIN_DIR}/${DRIVER_NAME} \
+              --build-arg GIT_CONFIG=${GIT_CONFIG} \
+              --build-arg GIT_TOKEN=${GIT_TOKEN} \
+              --build-arg DRIVER_VERSION=${DRIVER_VERSION} \
+              --build-arg DRIVER_MODULE=${DRIVER_MODULE} \
+              --build-arg OPEN_ISCSI_IQN=${OPEN_ISCSI_IQN} \
+              --build-arg OPEN_ISCSI_VERSION=${OPEN_ISCSI_VERSION} \
+              --build-arg OPEN_ISCSI_NAMESPACE=${OPEN_ISCSI_NAMESPACE}
 
 REGISTRY ?= nexenta
 REGISTRY_LOCAL ?= 10.3.199.92:5000
@@ -53,24 +90,23 @@ print-variables:
 
 .PHONY: build
 build:
-	mkdir -p ./bin
-	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/${DRIVER_NAME} -ldflags "${LDFLAGS}" ./cmd
+	env CGO_ENABLED=0 go build -o ${DRIVER_PATH} -ldflags "${LDFLAGS}" ./cmd
 
 .PHONY: container-build
 container-build:
-	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:${VERSION} --build-arg VERSION=${VERSION} .
+	docker build -f ${DOCKER_FILE} -t ${DRIVER_NAME}:${DRIVER_VERSION} ${DOCKER_ARGS} .
 
 .PHONY: container-push-local
 container-push-local:
-	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:${VERSION} --build-arg VERSION=${VERSION} .
-	docker tag  ${IMAGE_NAME}:${VERSION} ${REGISTRY_LOCAL}/${IMAGE_NAME}:${VERSION}
-	docker push ${REGISTRY_LOCAL}/${IMAGE_NAME}:${VERSION}
+	docker build -f ${DOCKER_FILE} -t ${DRIVER_NAME}:${DRIVER_VERSION} ${DOCKER_ARGS} .
+	docker tag ${DRIVER_NAME}:${DRIVER_VERSION} ${REGISTRY_LOCAL}/${DRIVER_NAME}:${DRIVER_VERSION}
+	docker push ${REGISTRY_LOCAL}/${DRIVER_NAME}:${DRIVER_VERSION}
 
 .PHONY: container-push-remote
 container-push-remote:
-	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:${VERSION} --build-arg VERSION=${VERSION} .
-	docker tag  ${IMAGE_NAME}:${VERSION} ${REGISTRY}/${IMAGE_NAME}:${VERSION}
-	docker push ${REGISTRY}/${IMAGE_NAME}:${VERSION}
+	docker build -f ${DOCKER_FILE} -t ${DRIVER_NAME}:${DRIVER_VERSION} ${DOCKER_ARGS} .
+	docker tag  ${DRIVER_NAME}:${DRIVER_VERSION} ${REGISTRY}/${DRIVER_NAME}:${DRIVER_VERSION}
+	docker push ${REGISTRY}/${DRIVER_NAME}:${DRIVER_VERSION}
 
 .PHONY: test
 test: test-unit
@@ -127,12 +163,11 @@ test-e2e-k8s-remote-image-container: check-env-TEST_K8S_IP
 # - nfs client requires running container as privileged one
 .PHONY: test-csi-sanity-container
 test-csi-sanity-container:
-	docker build \
-		--build-arg CSI_SANITY_VERSION_TAG=v2.1.0 \
+	docker build ${DOCKER_ARGS} \
+		--build-arg SANITY_VERSION=v3.0.0 \
 		-f ${DOCKER_FILE_TEST_CSI_SANITY} \
-		-t ${IMAGE_NAME}-test-csi-sanity .
-	docker run --network host --privileged=true --mount type=bind,source=/,target=/host,bind-propagation=rshared --mount type=bind,source=/tmp,target=/tmp,bind-propagation=rshared -i -e NOCOLORS=${NOCOLORS} ${IMAGE_NAME}-test-csi-sanity
-
+		-t ${DRIVER_NAME}-test-csi-sanity .
+	docker run --privileged --net=host -v /dev:/dev -i -e NOCOLORS=${NOCOLORS} ${DRIVER_NAME}-test-csi-sanity
 
 # run all tests (local registry image)
 .PHONY: test-all-local-image
@@ -176,10 +211,10 @@ release:
 		Are you sure? [y/N]: "
 	@(read ANSWER && case "$$ANSWER" in [yY]) true;; *) false;; esac)
 	docker login
-	make generate-changelog
+	#make generate-changelog
 	make container-build
 	make container-push-remote
-	git add CHANGELOG.md
+	#git add CHANGELOG.md
 	git commit -m "release v${VERSION}"
 	git push origin v${VERSION}
 	git tag v${VERSION}
