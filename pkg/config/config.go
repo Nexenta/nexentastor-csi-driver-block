@@ -36,7 +36,8 @@ type NsData struct {
     DefaultISCSIPort            string `yaml:"defaultiSCSIPort,omitempty"`
     DefaultDataIP               string `yaml:"defaultDataIp,omitempty"`
     ISCSITargetPrefix           string `yaml:"iSCSITargetPrefix,omitempty"`
-    DynamicTargetLunAllocation  bool   `yaml:"dynamicTargetLunAllocation" default:"true"`
+    DynamicTargetLunAllocation  string `yaml:"dynamicTargetLunAllocation"`
+    NumOfLunsPerTarget          string `yaml:"numOfLunsPerTarget"`
 }
 
 // GetFilePath - get filepath of found config file

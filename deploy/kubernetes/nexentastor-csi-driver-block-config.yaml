@@ -1,7 +1,7 @@
 # nexentastor-csi-driver config file to create k8s secret
 #
-# $ kubectl create secret generic nexentastor-csi-driver-block-config-driver \
-#   --from-file=deploy/kubernetes/nexentastor-csi-driver-block-config-driver.yaml
+# $ kubectl create secret generic nexentastor-csi-driver-block-config \
+#   --from-file=deploy/kubernetes/nexentastor-csi-driver-block-config.yaml
 #
 
 nexentastor_map:
