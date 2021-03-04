@@ -557,6 +557,24 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
     } else {
         targetGroup = cfg.DefaultTargetGroup
     }
+    iSCSITargetPrefix := ""
+    if v, ok := reqParams["iSCSITargetPrefix"]; ok {
+        iSCSITargetPrefix = v
+    } else {
+        iSCSITargetPrefix = cfg.ISCSITargetPrefix
+    }
+    dynamicTargetLunAllocation := ""
+    if v, ok := reqParams["dynamicTargetLunAllocation"]; ok {
+        dynamicTargetLunAllocation = v
+    } else {
+        dynamicTargetLunAllocation = cfg.DynamicTargetLunAllocation
+    }
+    numOfLunsPerTarget := ""
+    if v, ok := reqParams["numOfLunsPerTarget"]; ok {
+        numOfLunsPerTarget = v
+    } else {
+        numOfLunsPerTarget = cfg.NumOfLunsPerTarget
+    }
 
     res = &csi.CreateVolumeResponse{
         Volume: &csi.Volume{
@@ -570,6 +588,9 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
                 "TargetGroup": targetGroup,
                 "HostGroup": hostGroup,
                 "iSCSIPort": iSCSIPort,
+                "iSCSITargetPrefix": iSCSITargetPrefix,
+                "dynamicTargetLunAllocation": dynamicTargetLunAllocation,
+                "numOfLunsPerTarget": numOfLunsPerTarget,
             },
         },
     }

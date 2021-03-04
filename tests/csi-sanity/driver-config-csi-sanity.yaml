@@ -8,4 +8,4 @@ nexentastor_map:
     defaultTargetGroup: tg01
     defaultTarget: iqn.2005-07.com.nexenta:01:test
     defaultHostGroup: all
-debug: false
+debug: true

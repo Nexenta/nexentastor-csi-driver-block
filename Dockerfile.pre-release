@@ -1,5 +1,5 @@
 # pre-release container generates:
-# - CNAHGELOG.md
+# - CHANGELOG.md
 
 FROM golang:1.13
 

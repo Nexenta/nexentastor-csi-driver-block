@@ -35,7 +35,8 @@ metadata:
 spec:
   storageClassName: nexentastor-block-csi-driver-sc-nginx-dynamic
   accessModes:
-    - ReadWriteMany
+    # - ReadWriteMany
+    - ReadWriteOnce
   # volumeMode: Block
   resources:
     requests:

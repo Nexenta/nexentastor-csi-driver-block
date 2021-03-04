@@ -36,19 +36,28 @@ type NodeServer struct {
 }
 
 type CreateMappingParams struct {
-    Address     string
-    Target      string
     TargetGroup string
-    Port        string
     VolumePath  string
     HostGroup   string
 }
 
+type CreateTargetTgParams struct {
+    Address             string
+    Port                string
+    Target              string
+    ISCSITargetPrefix   string
+    TargetGroup         string
+    NumOfLunsPerTarget  int
+}
+
 const (
-    defaultFsType = "ext4"
+    DefaultISCSITargetPrefix = "iqn.2005-07.com.nexenta"
+    DefaultFsType = "ext4"
     DefaultISCSIPort = "3260"
     HostGroupPrefix = "csi"
     PathToInitiatorName = "/host/etc/iscsi/initiatorname.iscsi"
+    DefaultDynamicLunAllocation = false
+    DefaultNumOfLunsPerTarget = 256
 )
 
 
@@ -140,9 +149,12 @@ func (s *NodeServer) GetRealDeviceName(symLink string) (string, error) {
     l.Infof("Evaluating symLink: %s", symLink)
     devName, err := filepath.EvalSymlinks(fmt.Sprintf("/host/%s", symLink))
     if err != nil {
+        l.Errorf("Could not evaluate symlink: %s, err: %+v", symLink, err)
         return "", err
     }
-    devName = strings.TrimPrefix(devName, "/host")
+    if strings.HasPrefix(devName, "/host") {
+        devName = strings.TrimPrefix(devName, "/host")
+    }
     l.Infof("Device name is: %s", devName)
     return devName, err
 }
@@ -156,7 +168,7 @@ func (s *NodeServer) RemoveDevice(devName string) (error) {
     )
     filename := fmt.Sprintf("/host/sys/block%s/device/delete", strings.TrimPrefix(devName, "/dev"))
     if f, err = os.OpenFile(filename, os.O_APPEND | os.O_WRONLY, 0200); err != nil {
-        l.Warnf("Could not open file %s for writing.", filename)
+        l.Warnf("Could not open file %s for writing, err: %+v", filename, err)
         return nil
     }
 
@@ -176,12 +188,115 @@ func (s *NodeServer) RemoveDevice(devName string) (error) {
     return nil
 }
 
+// ResolveTargetGroup - find target with lowest lunmappings or create new one
+func (s *NodeServer) ResolveTargetGroup(params CreateTargetTgParams, nsProvider ns.ProviderInterface) (
+    target, targetGroup string,
+    err error,
+) {
+    l := s.log.WithField("func", "ResolveTargetGroup()")
+    l.Infof("params: '%+v'", params)
+    targetGroups, err := nsProvider.GetTargetGroups()
+    if err != nil {
+        return target, targetGroup, nil
+    }
+    var minLuns int
+    var minTargetGroup string
+    for _, currentTg := range targetGroups {
+        for _, currentTarget := range currentTg.Members {
+            if strings.HasPrefix(currentTarget, params.ISCSITargetPrefix) {
+                lunMappingParams := ns.GetLunMappingsParams{
+                    TargetGroup: currentTg.Name,
+                }
+                luns, err := nsProvider.GetLunMappings(lunMappingParams)
+                if err != nil {
+                    return target, targetGroup, nil
+                }
+                if minLuns == 0 || len(luns) < minLuns {
+                    minTargetGroup = currentTg.Name
+                    target = currentTarget
+                }
+            }
+        }
+    }
+    if minTargetGroup != "" {
+        return target, minTargetGroup, err
+    } else {
+        return s.CreateNewTargetTg(params, nsProvider)
+    }
+}
+
+func (s *NodeServer) CreateNewTargetTg(params CreateTargetTgParams, nsProvider ns.ProviderInterface) (
+    target, targetGroup string,
+    err error,
+) {
+    l := s.log.WithField("func", "CreateNewTargetTg()")
+    l.Infof("params: '%+v'", params)
+    if params.Target == "" {
+        targetGroup = uuid.New().String()
+        target = fmt.Sprintf("%s:%s", params.ISCSITargetPrefix, targetGroup)
+    } else {
+        target = params.Target
+        if params.TargetGroup == "" {
+            splittedTarget := strings.Split(target, ":")
+            l.Warnf("%+v", splittedTarget)
+            l.Warnf(splittedTarget[len(splittedTarget) - 1])
+            targetGroup = splittedTarget[len(splittedTarget) - 1]
+        } else {
+            targetGroup = params.TargetGroup
+        }
+    }
+    portInt, err := strconv.Atoi(params.Port)
+    if err != nil {
+        l.Errorf("Could not convert port to int, port: %s, err: %s", params.Port, err.Error())
+        return target, targetGroup, err
+    }
+    portal := ns.Portal{
+        Address: params.Address,
+        Port: portInt,
+    }
+    createTargetParams := ns.CreateISCSITargetParams{
+        Name: target,
+        Portals: []ns.Portal{portal},
+    }
+
+    err = nsProvider.CreateISCSITarget(createTargetParams)
+    if err != nil {
+        return target, targetGroup, err
+    }
+
+    createTargetGroupParams := ns.CreateTargetGroupParams{
+        Name: targetGroup,
+        Members: []string{target},
+    }
+    err = nsProvider.CreateUpdateTargetGroup(createTargetGroupParams)
+    if err != nil {
+    }
+    return target, targetGroup, err
+}
+
 func (s *NodeServer) ParseVolumeContext(
     volumeContext map[string]string, nsProvider ns.ProviderInterface, configName string) (
     hostGroup, targetGroup, port, dataIP, iSCSITarget string,
     err error,
 ) {
+    l := s.log.WithField("func", "ParseVolumeContext()")
     cfg := s.config.NsMap[configName]
+    targetGroup = volumeContext["TargetGroup"]
+    iSCSITarget = volumeContext["Target"]
+    iSCSITargetPrefix := cfg.ISCSITargetPrefix
+
+    port = volumeContext["iSCSIPort"]
+    if port == "" {
+        if cfg.DefaultISCSIPort != "" {
+            port = cfg.DefaultISCSIPort
+        } else {
+            port = DefaultISCSIPort
+        }
+    }
+    if iSCSITargetPrefix == "" {
+        iSCSITargetPrefix = DefaultISCSITargetPrefix
+    }
+
     hostGroup = volumeContext["HostGroup"]
     if hostGroup == "" {
         if cfg.DefaultHostGroup != "" {
@@ -193,25 +308,38 @@ func (s *NodeServer) ParseVolumeContext(
             }
         }
     }
-    targetGroup = volumeContext["TargetGroup"]
-    if targetGroup == "" {
-        targetGroup = cfg.DefaultTargetGroup
-    }
-    port = volumeContext["iSCSIPort"]
-    if port == "" {
-        if cfg.DefaultISCSIPort != "" {
-            port = cfg.DefaultISCSIPort
-        } else {
-            port = DefaultISCSIPort
-        }
-    }
+
     dataIP = volumeContext["dataIP"]
     if dataIP == "" {
         dataIP = cfg.DefaultDataIP
     }
-    iSCSITarget = volumeContext["Target"]
-    if iSCSITarget == "" {
-        iSCSITarget = cfg.DefaultTarget
+    numOfLunsPerTarget, err := strconv.Atoi(volumeContext["numOfLunsPerTarget"])
+    if err != nil {
+        l.Infof("Could not parse numOfLunsPerTarget, setting default: %+v", DefaultNumOfLunsPerTarget)
+        numOfLunsPerTarget = DefaultNumOfLunsPerTarget
+    }
+
+    params := CreateTargetTgParams{
+        Address: dataIP,
+        Port: port,
+        Target: iSCSITarget,
+        ISCSITargetPrefix: iSCSITargetPrefix,
+        NumOfLunsPerTarget: numOfLunsPerTarget,
+        TargetGroup: targetGroup,
+    }
+
+    dynamicTargetLunAllocation, err := strconv.ParseBool(cfg.DynamicTargetLunAllocation)
+    if err != nil {
+        l.Infof("Could not parse cfg.DynamicTargetLunAllocation, defaulting to false. Error: %+v", err)
+        dynamicTargetLunAllocation = DefaultDynamicLunAllocation
+    }
+    if dynamicTargetLunAllocation == true {
+        iSCSITarget, targetGroup, err = s.ResolveTargetGroup(params, nsProvider)
+        if err != nil {
+            return hostGroup, targetGroup, port, dataIP, iSCSITarget, err
+        }
+    } else {
+        iSCSITarget, targetGroup, err = s.CreateNewTargetTg(params, nsProvider)
     }
     return hostGroup, targetGroup, port, dataIP, iSCSITarget, nil
 }
@@ -267,7 +395,7 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
     if err != nil {
         return nil, err
     }
-    
+
     hostGroup, targetGroup, port, dataIP, iSCSITarget, err := s.ParseVolumeContext(
         volumeContext, nsProvider, configName)
     if err != nil {
@@ -284,12 +412,10 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
     if err != nil {
         return nil, err
     }
+
     if len(lunMappings) == 0 {
         params := CreateMappingParams{
-            Address: dataIP,
-            Target: iSCSITarget,
             TargetGroup: targetGroup,
-            Port: port,
             VolumePath: volumePath,
             HostGroup: hostGroup,
         }
@@ -306,10 +432,9 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
             return nil, status.Error(codes.Internal, err.Error())
         }
     } else {
-        device, err = s.MountFromTargetPath(targetPath)
+        device, err = s.DeviceFromTargetPath(targetPath)
         if err != nil {
             device = ""
-            // return nil, err
         }
     }
 
@@ -350,6 +475,7 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
     switch volumeCapability.GetAccessType().(type) {
     case *csi.VolumeCapability_Block:
+        targetPath = filepath.Join(targetPath, "device")
         cmd := exec.Command("ln", "-s", source, targetPath)
         l.Infof("Executing command: %+v", cmd)
         _, err = cmd.CombinedOutput()
@@ -366,12 +492,12 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
     fsType := capabilityMount.GetFsType()
     if len(fsType) == 0 {
-        fsType = defaultFsType
+        fsType = DefaultFsType
     }
     deviceFS := s.getFSType(source)
     if deviceFS == "" {
         if fsType == "" {
-            fsType = defaultFsType
+            fsType = DefaultFsType
         }
         err = s.formatVolume(source, fsType)
         if err != nil {
@@ -409,6 +535,7 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
         return nil, err
     }
 
+    l.Infof("Device %s staged at %s", source, targetPath)
     return &csi.NodeStageVolumeResponse{}, nil
 }
 
@@ -456,23 +583,38 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
         }
     }
 
-    port := cfg.DefaultISCSIPort
-    if port == "" {
-        port = DefaultISCSIPort
+    // Raw block devices
+    if strings.HasSuffix(targetPath, "/device") {
+        symLink := filepath.Join(targetPath, "device")
+        cmd := exec.Command("realpath", symLink)
+        l.Infof("Executing command: %+v", cmd)
+        out, err := cmd.CombinedOutput()
+        if err != nil {
+            l.Errorf("Command output: %+v", string(out))
+            return nil, err
+        }
+        dev := strings.TrimSpace(string(out))
+        err = s.RemoveDevice(dev)
+        if err != nil {
+            return nil, err
+        }
+        if err := os.RemoveAll(targetPath); err != nil {
+            if os.IsNotExist(err) {
+                l.Infof("mount point '%s' already doesn't exist: '%s', return OK", targetPath, err)
+                return &csi.NodeUnstageVolumeResponse{}, nil
+            } else {
+                return nil, err
+            }
+        }
+        return &csi.NodeUnstageVolumeResponse{}, nil
     }
-    dataIP := cfg.DefaultDataIP
-    portal := fmt.Sprintf("%s:%s", dataIP, port)
-    iSCSITarget := cfg.DefaultTarget
-    lunNumber := getLunResp.Lun
-    devByPath := s.ConstructDevByPath(portal, iSCSITarget, lunNumber)
 
-    dev, err := s.GetRealDeviceName(devByPath)
+    // Mounted devices
+    dev, err := s.DeviceFromTargetPath(targetPath)
     if err != nil {
-        return nil, err
-    }
-
-    err = s.RemoveDevice(dev)
-    if err != nil {
+        if strings.Contains(err.Error(), "Could not determine device path") {
+            return &csi.NodeUnstageVolumeResponse{}, nil
+        }
         return nil, err
     }
 
@@ -492,7 +634,7 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
     }
 
     if notMountPoint {
-        if err := os.Remove(targetPath); err != nil {
+        if err := os.RemoveAll(targetPath); err != nil {
             l.Infof("Remove targetPath error: %s", err.Error())
         }
         return &csi.NodeUnstageVolumeResponse{}, nil
@@ -502,7 +644,12 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
         return nil, status.Errorf(codes.Internal, "Failed to unmount targetPath '%s': %s", targetPath, err)
     }
 
-    if err := os.Remove(targetPath); err != nil && !os.IsNotExist(err) {
+    err = s.RemoveDevice(dev)
+    if err != nil {
+        return nil, err
+    }
+
+    if err := os.RemoveAll(targetPath); err != nil && !os.IsNotExist(err) {
         return nil, status.Errorf(codes.Internal, "Cannot remove unmounted target path '%s': %s", targetPath, err)
     }
     return &csi.NodeUnstageVolumeResponse{}, nil
@@ -515,7 +662,6 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
 ) {
     l := s.log.WithField("func", "NodePublishVolume()")
     l.Infof("request: '%+v'", protosanitizer.StripSecrets(req))
-    volumeContext := req.GetVolumeContext()
 
     volumeID := req.GetVolumeId()
 
@@ -537,92 +683,55 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     if volumeCapability == nil {
         return nil, status.Error(codes.InvalidArgument, "Volume capability not provided")
     }
-
-    var secret string
-    secrets := req.GetSecrets()
-    for _, v := range secrets {
-        secret = v
-    }
-    // read and validate config
-    err := s.refreshConfig(secret)
-    if err != nil {
-        return nil, status.Errorf(codes.FailedPrecondition, "Cannot use config file: %s", err)
-    }
-
-    splittedVol := strings.Split(volumeID, ":")
-    if len(splittedVol) != 2 {
-        return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("VolumeId is in wrong format: %s", volumeID))
-    }
-    configName, volumePath := splittedVol[0], splittedVol[1]
-    cfg := s.config.NsMap[configName]
-    nsProvider, err, configName := s.resolveNS(configName, cfg.DefaultVolumeGroup)
-    if err != nil {
-        return nil, err
-    }
-
-    getLunResp, err := nsProvider.GetLunMapping(volumePath)
-    if err != nil{
-        return nil, err
-    }
-    lunNumber := getLunResp.Lun
     // Make dir if dir not present
-    _, err = os.Stat(targetPath)
+    _, err := os.Stat(targetPath)
     if os.IsNotExist(err) {
         if err = os.MkdirAll(filepath.Dir(targetPath), 0750); err != nil {
             return nil, status.Error(codes.Internal, err.Error())
         }
     }
 
-    _, _, port, dataIP, iSCSITarget, err := s.ParseVolumeContext(
-        volumeContext, nsProvider, configName)
-    if err != nil {
-        return nil, err
-    }
-
-    portal := fmt.Sprintf("%s:%s", dataIP, port)
-    devByPath := s.ConstructDevByPath(portal, iSCSITarget, lunNumber)
-
-    devName, err := s.GetRealDeviceName(devByPath)
-    if err != nil {
-        return nil, err
-    }
-
+    devName := ""
     switch volumeCapability.GetAccessType().(type) {
     case *csi.VolumeCapability_Block:
-        cmd := exec.Command("ln", "-s", devName, targetPath)
+        source = filepath.Join(source, "device")
+        cmd := exec.Command("realpath", source)
+        l.Infof("Executing command: %+v", cmd)
+        out, err := cmd.CombinedOutput()
+        if err != nil {
+            l.Errorf("Command output: %+v", string(out))
+            return nil, err
+        }
+        devName = strings.TrimSpace(string(out))
+        cmd = exec.Command("ln", "-s", devName, targetPath)
         l.Infof("Executing command: %+v", cmd)
         _, err = cmd.CombinedOutput()
         if err != nil {
             return nil, err
         }
+        l.Infof("Device %s published to %s successfully", devName, targetPath)
         return &csi.NodePublishVolumeResponse{}, nil
     case *csi.VolumeCapability_Mount:
-        fsType := volumeCapability.GetMount().GetFsType()
-        deviceFS := s.getFSType(devName)
-        if deviceFS == "" {
-            if fsType == "" {
-                fsType = "ext4"
-            }
-            err = s.formatVolume(devName, fsType)
-            if err != nil {
-                return nil, err
-            }
-        } else if fsType != "" && deviceFS != fsType {
-            return nil, fmt.Errorf(
-                "Volume %s is already formatted in %s, requested: %s", volumeID, deviceFS, fsType)
+        // devName, err = s.GetRealDeviceName(source)
+        // if err != nil {
+        //     return nil, err
+        // }
+        devName, err = s.DeviceFromTargetPath(source)
+        if err != nil {
+            return nil, err
         }
-
-        mountOptions := []string{"bind"}
+        fsType := volumeCapability.GetMount().GetFsType()
+        mountOptions := []string{}
         if req.GetReadonly() {
             mountOptions = append(mountOptions, "ro")
         }
-        err = s.mountVolume(source, targetPath, fsType, mountOptions)
+        err = s.mountVolume(devName, targetPath, fsType, mountOptions)
         if err != nil {
             return nil, err
         }
     }
 
-    l.Infof("Device %s published to %s", devName, targetPath)
+    l.Infof("Device %s published to %s successfully", devName, targetPath)
     return &csi.NodePublishVolumeResponse{}, nil
 }
 
@@ -681,41 +790,11 @@ func (s *NodeServer) CreateISCSIMapping(params CreateMappingParams, nsProvider n
     l := s.log.WithField("func", "CreateISCSIMapping()")
     l.Infof("Creating iSCSI mapping with params: %+v", params)
 
-    iSCSIParams := ns.CreateISCSITargetParams{
-        Name: params.Target,
-    }
-    portInt, err := strconv.Atoi(params.Port)
-    if err != nil {
-        l.Errorf("Could not convert port to int, port: %s, err: %s", params.Port, err.Error())
-        return err
-    }
-    iSCSIParams.Portals = append(iSCSIParams.Portals, ns.Portal{
-        Address: params.Address,
-        Port: portInt,
-    })
-    err = nsProvider.CreateISCSITarget(iSCSIParams)
-    if err != nil {
-        return err
-    }
-
-    createTargetGroupParams := ns.CreateTargetGroupParams{
-        Name: params.TargetGroup,
-        Members: []string{params.Target},
-    }
-    err = nsProvider.CreateUpdateTargetGroup(createTargetGroupParams)
-    if err != nil {
-        return err
-    }
-
-    err = nsProvider.CreateLunMapping(ns.CreateLunMappingParams{
+    return nsProvider.CreateLunMapping(ns.CreateLunMappingParams{
         Volume: params.VolumePath,
         TargetGroup: params.TargetGroup,
         HostGroup: params.HostGroup,
     })
-    if err != nil {
-        return err
-    }
-    return nil
 }
 
 func (s *NodeServer) mountVolume(devName, targetPath, fsType string, mountOptions []string) error {
@@ -830,7 +909,6 @@ func (s *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
     if len(targetPath) == 0 {
         return nil, status.Error(codes.InvalidArgument, "Target path must be provided")
     }
-
     mounter := mount.New("")
     notMountPoint, err := mounter.IsLikelyNotMountPoint(targetPath)
     if err != nil {
@@ -847,17 +925,19 @@ func (s *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
     }
 
     if notMountPoint {
-        if err := os.Remove(targetPath); err != nil {
+        if err := os.RemoveAll(targetPath); err != nil {
             l.Infof("Remove targetPath error: %s", err.Error())
         }
         return &csi.NodeUnpublishVolumeResponse{}, nil
     }
 
     if err := mounter.Unmount(targetPath); err != nil {
-        return nil, status.Errorf(codes.Internal, "Failed to unmount target path '%s': %s", targetPath, err)
+        if !strings.Contains(err.Error(), "not mounted") {
+            return nil, status.Errorf(codes.Internal, "Failed to unmount target path '%s': %s", targetPath, err)
+        }
     }
 
-    if err := os.Remove(targetPath); err != nil && !os.IsNotExist(err) {
+    if err := os.RemoveAll(targetPath); err != nil && !os.IsNotExist(err) {
         return nil, status.Errorf(codes.Internal, "Cannot remove unmounted target path '%s': %s", targetPath, err)
     }
 
@@ -955,8 +1035,8 @@ func (s *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
     return &csi.NodeExpandVolumeResponse{}, nil
 }
 
-func (s *NodeServer) MountFromTargetPath(volumePath string) (deviceName string, err error) {
-    l := s.log.WithField("func", "MountFromTargetPath()")
+func (s *NodeServer) DeviceFromTargetPath(volumePath string) (deviceName string, err error) {
+    l := s.log.WithField("func", "DeviceFromTargetPath()")
 
     cmd := exec.Command("findmnt", "-o", "source", "--noheadings", "--target", volumePath)
     l.Infof("Executing command: %+v", cmd)

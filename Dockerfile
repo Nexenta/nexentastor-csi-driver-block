@@ -15,8 +15,8 @@ LABEL maintainer="Nexenta Systems, Inc."
 LABEL description="NexentaStor Block CSI Driver"
 LABEL io.k8s.description="NexentaStor Block CSI Driver"
 RUN apk update || true &&  \
-	apk add coreutils util-linux blkid \
-	e2fsprogs bash kmod curl jq ca-certificates
+    apk add coreutils util-linux blkid \
+    e2fsprogs bash kmod curl jq ca-certificates
 
 RUN mkdir /nexentastor-csi-driver-block
 RUN mkdir -p /etc/ && mkdir -p /config/
@@ -31,14 +31,14 @@ RUN    ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-c
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/blockdev \
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/blkid \
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/e2fsck \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/ln \
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/iscsiadm \
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/lsscsi \
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.ext3 \
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.ext4 \
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.xfs \
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipath \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipathd 
+    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipathd \
+    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/ln
 
 ENV PATH="/nexentastor-csi-driver-block/:${PATH}"
 ENTRYPOINT ["/nexentastor-csi-driver-block/nexentastor-csi-driver-block"]
