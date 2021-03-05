@@ -104,6 +104,8 @@ Releases can be found here - https://github.com/Nexenta/nexentastor-csi-driver-b
    | `defaultTarget`       | NexentaStor iSCSI target iqn                                    | yes        | `iqn.2005-07.com.nexenta:01:csiTarget1`|
    | `defaultTargetGroup`  | NexentaStor target group name                                   | yes        | `CSI-tg1`   |
    | `defaultDataIp`       | NexentaStor data IP or HA VIP for mounting shares               | yes for PV | `20.20.20.21`                                                |
+   | `dynamicTargetLunAllocation` | If true driver will automatically manage iSCSI target and targetgroup creation (default: false)| no         | `true` |
+   | `numOfLunsPerTarget`  | Maximum number of luns that can be assigned to each target with dynamicTargetLunAllocation | no         | `256`                                                       |
    | `debug`               | print more logs (default: false)                                | no         | `true`                                                       |
    | `zone`                | Zone to match topology.kubernetes.io/zone.                      | no         | `us-west`                                                       |
 

@@ -56,7 +56,7 @@ const (
     DefaultISCSIPort = "3260"
     HostGroupPrefix = "csi"
     PathToInitiatorName = "/host/etc/iscsi/initiatorname.iscsi"
-    DefaultDynamicLunAllocation = false
+    DefaultDynamicTargetLunAllocation = false
     DefaultNumOfLunsPerTarget = 256
 )
 
@@ -123,6 +123,7 @@ func (s* NodeServer) ISCSILogInRescan(target, portal string) (error) {
     l.Infof("Executing command: %+v", cmd)
     out, err := cmd.CombinedOutput()
     if err != nil {
+        l.Errorf("iscsiadm discovery error: %+v", err)
         return err
     }
     cmd = exec.Command("iscsiadm", "-m", "node", "-T", target, "-p", portal, "-l")
@@ -331,7 +332,7 @@ func (s *NodeServer) ParseVolumeContext(
     dynamicTargetLunAllocation, err := strconv.ParseBool(cfg.DynamicTargetLunAllocation)
     if err != nil {
         l.Infof("Could not parse cfg.DynamicTargetLunAllocation, defaulting to false. Error: %+v", err)
-        dynamicTargetLunAllocation = DefaultDynamicLunAllocation
+        dynamicTargetLunAllocation = DefaultDynamicTargetLunAllocation
     }
     if dynamicTargetLunAllocation == true {
         iSCSITarget, targetGroup, err = s.ResolveTargetGroup(params, nsProvider)

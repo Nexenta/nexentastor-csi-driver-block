@@ -383,8 +383,9 @@ spec:
               mountPath: /csi
             - name: secret
               mountPath: /config
-            - name: dev
-              mountPath: /dev
+            - name: host
+              mountPath: /host
+              mountPropagation: Bidirectional
             - name: pods-mount-dir
               mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
@@ -404,9 +405,9 @@ spec:
           hostPath:
             path: /var/lib/kubelet/pods
             type: Directory
-        - name: dev
+        - name: host
           hostPath:
-            path: /dev
+            path: /
             type: Directory
         - name: plugin-dir
           hostPath:
