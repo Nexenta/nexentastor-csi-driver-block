@@ -103,7 +103,7 @@ test-e2e-k8s-local-image-container: check-env-TEST_K8S_IP
 		-e NOCOLORS=${NOCOLORS} -e TEST_K8S_IP=${TEST_K8S_IP} \
 		${IMAGE_NAME}-test test-e2e-k8s-local-image
 	docker image prune -f
-	docker images | grep nexentastor-csi-driver-block-test  | awk '{print $1}' | xargs docker rmi -f
+	docker images | grep nexentastor-csi-driver-block-test  | awk '{print $$1}' | xargs docker rmi -f
 
 # run e2e k8s tests using image from hub.docker.com
 .PHONY: test-e2e-k8s-remote-image
@@ -122,7 +122,7 @@ test-e2e-k8s-remote-image-container: check-env-TEST_K8S_IP
 		-e NOCOLORS=${NOCOLORS} -e TEST_K8S_IP=${TEST_K8S_IP} \
 		${IMAGE_NAME}-test test-e2e-k8s-remote-image
 	docker image prune -f
-	docker images | grep nexentastor-csi-driver-block-test | awk '{print $1}' | xargs docker rmi -f
+	docker images | grep nexentastor-csi-driver-block-test | awk '{print $$1}' | xargs docker rmi -f
 
 # csi-sanity tests:
 # - tests make requests to actual NS, config file: ./tests/csi-sanity/*.yaml
@@ -138,7 +138,7 @@ test-csi-sanity-container:
 		-t ${IMAGE_NAME}-test-csi-sanity .
 	docker run --network host --privileged=true --mount type=bind,source=/,target=/host,bind-propagation=rshared --mount type=bind,source=/tmp,target=/tmp,bind-propagation=rshared -i -e NOCOLORS=${NOCOLORS} ${IMAGE_NAME}-test-csi-sanity
 	docker image prune -f
-	docker images | grep nexentastor-csi-driver-block-test-csi-sanity | awk '{print $1}' | xargs docker rmi -f
+	docker images | grep nexentastor-csi-driver-block-test-csi-sanity | awk '{print $$1}' | xargs docker rmi -f
 
 # run all tests (local registry image)
 .PHONY: test-all-local-image
