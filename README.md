@@ -106,6 +106,9 @@ Releases can be found here - https://github.com/Nexenta/nexentastor-csi-driver-b
    | `defaultDataIp`       | NexentaStor data IP or HA VIP for mounting shares               | yes for PV | `20.20.20.21`                                                |
    | `dynamicTargetLunAllocation` | If true driver will automatically manage iSCSI target and targetgroup creation (default: false)| no         | `true` |
    | `numOfLunsPerTarget`  | Maximum number of luns that can be assigned to each target with dynamicTargetLunAllocation | no         | `256`                                                       |
+   | `useChapAuth`         | CHAP authentication for iSCSI targets         | no             | `true`     |
+   | `chapUser`            | Username for CHAP authentication                        | no             | `admin`    |
+   | `chapSecret`          | Password/secret for CHAP authentication. Minimun length is 12 symbols   | yes when useChapSecret is `true` | `verysecretpassword`                                                       |
    | `debug`               | print more logs (default: false)                                | no         | `true`                                                       |
    | `zone`                | Zone to match topology.kubernetes.io/zone.                      | no         | `us-west`                                                       |
 
@@ -336,6 +339,25 @@ kubectl get volumesnapshots.snapshot.storage.k8s.io
 
 # snapshot content list
 kubectl get volumesnapshotcontents.snapshot.storage.k8s.io
+```
+
+## CHAP authentication
+
+To use iSCSI CHAP authentication, configure your iSCSI client's initiator username and password on each kubernetes node. Example for Ubuntu 18.04:
+- Open iscsid config and set username(optional) and password for session auth (note that minimum lentgh for password is 12):
+```bash
+vi /etc/iscsi/iscsid.conf
+
+node.session.auth.username = admin
+node.session.auth.password = supersecretpassword
+systemctl restart iscsid.service
+```
+
+Now that your client is configured, add according values to driver's config or storageClass (see examples/nginx-dynamic-volume-chap):
+```bash
+    useChapAuth: true
+    chapUser: admin
+    chapSecret: supersecretpassword
 ```
 
 ## Uninstall

@@ -58,6 +58,7 @@ const (
     PathToInitiatorName = "/host/etc/iscsi/initiatorname.iscsi"
     DefaultDynamicTargetLunAllocation = false
     DefaultNumOfLunsPerTarget = 256
+    DefaultUseChapAuth = false
 )
 
 
@@ -131,7 +132,8 @@ func (s* NodeServer) ISCSILogInRescan(target, portal string) (error) {
     out, err = cmd.CombinedOutput()
     if err != nil {
         if !strings.Contains(string(out), "already present") {
-            return err
+            return status.Errorf(codes.Unauthenticated, "Was not able to login to target, err: %+v", err)
+            // return err
         } else {
             cmd := exec.Command("iscsiadm", "-m", "node", "-T", target, "-p", portal, "--rescan")
             l.Infof("Executing command: %+v", cmd)
@@ -239,8 +241,6 @@ func (s *NodeServer) CreateNewTargetTg(params CreateTargetTgParams, nsProvider n
         target = params.Target
         if params.TargetGroup == "" {
             splittedTarget := strings.Split(target, ":")
-            l.Warnf("%+v", splittedTarget)
-            l.Warnf(splittedTarget[len(splittedTarget) - 1])
             targetGroup = splittedTarget[len(splittedTarget) - 1]
         } else {
             targetGroup = params.TargetGroup
@@ -329,9 +329,9 @@ func (s *NodeServer) ParseVolumeContext(
         TargetGroup: targetGroup,
     }
 
-    dynamicTargetLunAllocation, err := strconv.ParseBool(cfg.DynamicTargetLunAllocation)
+    dynamicTargetLunAllocation, err := strconv.ParseBool(volumeContext["dynamicTargetLunAllocation"])
     if err != nil {
-        l.Infof("Could not parse cfg.DynamicTargetLunAllocation, defaulting to false. Error: %+v", err)
+        l.Infof("Could not parse dynamicTargetLunAllocation, defaulting to %+v. Error: %+v", DefaultDynamicTargetLunAllocation, err)
         dynamicTargetLunAllocation = DefaultDynamicTargetLunAllocation
     }
     if dynamicTargetLunAllocation == true {
@@ -342,7 +342,73 @@ func (s *NodeServer) ParseVolumeContext(
     } else {
         iSCSITarget, targetGroup, err = s.CreateNewTargetTg(params, nsProvider)
     }
+
+    // Check if CHAP auth is enabled
+    useChapAuth, err := strconv.ParseBool(volumeContext["useChapAuth"])
+    if err != nil {
+        l.Infof("Could not parse useChapAuth, defaulting to %+v. Error: %+v", DefaultUseChapAuth, err)
+        useChapAuth = DefaultUseChapAuth
+    }
+    if useChapAuth == true {
+        nodeIQN, err := s.GetNodeIQN()
+        if err != nil {
+            return hostGroup, targetGroup, port, dataIP, iSCSITarget, err
+        }
+        err = s.SetChapAuth(nodeIQN, volumeContext["chapUser"], volumeContext["chapSecret"], nsProvider)
+        if err != nil {
+            return hostGroup, targetGroup, port, dataIP, iSCSITarget, err
+        }
+        // Set authentication to CHAP for iSCSI target
+        updateParams := ns.UpdateISCSITargetParams{
+            Authentication: "chap",
+        }
+        err = nsProvider.UpdateISCSITarget(iSCSITarget, updateParams)
+        if err != nil {
+            return hostGroup, targetGroup, port, dataIP, iSCSITarget, err
+        }
+    }
     return hostGroup, targetGroup, port, dataIP, iSCSITarget, nil
+}
+
+func (s *NodeServer) SetChapAuth(name, chapUser, chapSecret string, nsProvider ns.ProviderInterface) (err error) {
+    l := s.log.WithField("func", "SetChapAuth()")
+    l.Warnf("params: name: %+v, chapUser: %+v, chapSecret: %+v", name, chapUser, chapSecret)
+    if name == "" {
+        return status.Error(codes.InvalidArgument, "iSCSI IQN not provided")
+    }
+    if chapSecret == "" {
+        return status.Error(codes.InvalidArgument, "chapSecret not provided")
+    }
+
+    _, err = nsProvider.GetRemoteInitiator(name)
+    if err != nil {
+        if ns.IsNotExistNefError(err) {
+            // Create new remote initiator
+            createParams := ns.CreateRemoteInitiatorParams{
+                Name: name,
+                ChapUser: chapUser,
+                ChapSecret: chapSecret,
+            }
+            err = nsProvider.CreateRemoteInitiator(createParams)
+            if err != nil {
+                return err
+            }
+            return nil
+        } else {
+            // Other error -> fail
+            return err
+        }
+    }
+    // No error means that remoteInitiator exists -> update with our credentials
+    updateParams := ns.UpdateRemoteInitiatorParams{
+        ChapUser: chapUser,
+        ChapSecret: chapSecret,
+    }
+    err = nsProvider.UpdateRemoteInitiator(name, updateParams)
+    if err != nil {
+        return err
+    }
+    return nil
 }
 
 func (s *NodeServer) ConstructDevByPath(portal, iSCSITarget string, lunNumber int) (devByPath string) {
