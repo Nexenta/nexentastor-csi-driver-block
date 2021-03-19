@@ -576,6 +576,27 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
         numOfLunsPerTarget = cfg.NumOfLunsPerTarget
     }
 
+    useChapAuth := ""
+    if v, ok := reqParams["useChapAuth"]; ok {
+        useChapAuth = v
+    } else {
+        useChapAuth = cfg.UseChapAuth
+    }
+
+    chapUser := ""
+    if v, ok := reqParams["chapUser"]; ok {
+        chapUser = v
+    } else {
+        chapUser = cfg.ChapUser
+    }
+
+    chapSecret := ""
+    if v, ok := reqParams["chapSecret"]; ok {
+        chapSecret = v
+    } else {
+        chapSecret = cfg.ChapSecret
+    }
+
     res = &csi.CreateVolumeResponse{
         Volume: &csi.Volume{
             ContentSource: contentSource,
@@ -591,6 +612,9 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
                 "iSCSITargetPrefix": iSCSITargetPrefix,
                 "dynamicTargetLunAllocation": dynamicTargetLunAllocation,
                 "numOfLunsPerTarget": numOfLunsPerTarget,
+                "useChapAuth": useChapAuth,
+                "chapUser": chapUser,
+                "chapSecret": chapSecret,
             },
         },
     }

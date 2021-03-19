@@ -102,6 +102,8 @@ test-e2e-k8s-local-image-container: check-env-TEST_K8S_IP
 	docker run -i --rm -v ${HOME}/.ssh:/root/.ssh:ro \
 		-e NOCOLORS=${NOCOLORS} -e TEST_K8S_IP=${TEST_K8S_IP} \
 		${IMAGE_NAME}-test test-e2e-k8s-local-image
+	docker image prune -f
+	docker images | grep nexentastor-csi-driver-block-test  | awk '{print $$1}' | xargs docker rmi -f
 
 # run e2e k8s tests using image from hub.docker.com
 .PHONY: test-e2e-k8s-remote-image
@@ -119,6 +121,8 @@ test-e2e-k8s-remote-image-container: check-env-TEST_K8S_IP
 	docker run -i --rm -v ${HOME}/.ssh:/root/.ssh:ro \
 		-e NOCOLORS=${NOCOLORS} -e TEST_K8S_IP=${TEST_K8S_IP} \
 		${IMAGE_NAME}-test test-e2e-k8s-remote-image
+	docker image prune -f
+	docker images | grep nexentastor-csi-driver-block-test | awk '{print $$1}' | xargs docker rmi -f
 
 # csi-sanity tests:
 # - tests make requests to actual NS, config file: ./tests/csi-sanity/*.yaml
@@ -127,12 +131,14 @@ test-e2e-k8s-remote-image-container: check-env-TEST_K8S_IP
 # - nfs client requires running container as privileged one
 .PHONY: test-csi-sanity-container
 test-csi-sanity-container:
+	rm -rf /tmp/csi-mount /tmp/csi-staging
 	docker build \
 		--build-arg CSI_SANITY_VERSION_TAG=v2.1.0 \
 		-f ${DOCKER_FILE_TEST_CSI_SANITY} \
 		-t ${IMAGE_NAME}-test-csi-sanity .
 	docker run --network host --privileged=true --mount type=bind,source=/,target=/host,bind-propagation=rshared --mount type=bind,source=/tmp,target=/tmp,bind-propagation=rshared -i -e NOCOLORS=${NOCOLORS} ${IMAGE_NAME}-test-csi-sanity
-
+	docker image prune -f
+	docker images | grep nexentastor-csi-driver-block-test-csi-sanity | awk '{print $$1}' | xargs docker rmi -f
 
 # run all tests (local registry image)
 .PHONY: test-all-local-image

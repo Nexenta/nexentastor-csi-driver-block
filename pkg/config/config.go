@@ -38,6 +38,9 @@ type NsData struct {
     ISCSITargetPrefix           string `yaml:"iSCSITargetPrefix,omitempty"`
     DynamicTargetLunAllocation  string `yaml:"dynamicTargetLunAllocation"`
     NumOfLunsPerTarget          string `yaml:"numOfLunsPerTarget"`
+    UseChapAuth                 string `yaml:"useChapAuth"`
+    ChapUser                    string `yaml:"chapUser"`
+    ChapSecret                  string `yaml:"chapSecret"`
 }
 
 // GetFilePath - get filepath of found config file
