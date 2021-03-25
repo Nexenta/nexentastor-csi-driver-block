@@ -1,6 +1,18 @@
 
-<a name="vv1.0.1"></a>
-## [vv1.0.1](https://github.com/Nexenta/nexentastor-csi-driver/compare/v1.0.0...vv1.0.1) (2020-09-22)
+<a name="vv1.2.0"></a>
+## [vv1.2.0](https://github.com/Nexenta/nexentastor-csi-driver/compare/v1.1.0...vv1.2.0) (2021-03-19)
+
+
+<a name="v1.1.0"></a>
+## [v1.1.0](https://github.com/Nexenta/nexentastor-csi-driver/compare/v1.0.1...v1.1.0) (2021-02-23)
+
+### Pull Requests
+
+* Merge pull request [#8](https://github.com/Nexenta/nexentastor-csi-driver/issues/8) from Nexenta/bugfixes/ES-433
+
+
+<a name="v1.0.1"></a>
+## [v1.0.1](https://github.com/Nexenta/nexentastor-csi-driver/compare/v1.0.0...v1.0.1) (2020-09-22)
 
 
 <a name="v1.0.0"></a>
