@@ -35,9 +35,9 @@ metadata:
 spec:
   storageClassName: nexentastor-block-csi-driver-sc-nginx-dynamic
   accessModes:
-    # - ReadWriteMany
-    - ReadWriteOnce
-  # volumeMode: Block
+    - ReadWriteMany
+    # - ReadWriteOnce
+  volumeMode: Block
   resources:
     requests:
       storage: 2Gi
@@ -58,10 +58,10 @@ spec:
       ports:
         - containerPort: 80
           protocol: TCP
-      # volumeDevices:
-      volumeMounts:
-        # - devicePath: /dev/sdc
-        - mountPath: /mountedDisk
+      # volumeMounts:
+      #   - mountPath: /mountedDisk
+      volumeDevices:
+        - devicePath: /dev/sdc
           name: nexentastor-block-csi-driver-data
   volumes:
     - name: nexentastor-block-csi-driver-data
