@@ -126,12 +126,16 @@ Releases can be found here - https://github.com/Nexenta/nexentastor-csi-driver-b
    kubectl apply -f deploy/kubernetes/nexentastor-csi-driver-block.yaml
    ```
 
+6. For snapshotting capabilities additional CRDs must be installed once per cluster and external-snapshotter deployed:
+  ``` bash
+   kubectl apply -f deploy/kubernetes/snapshots/crds.yaml
+   kubectl apply -f deploy/kubernetes/snapshots/snapshotter.yaml
+  ```
+
 Configuring multiple controller volume replicas
 We can configure this by changing the deploy/kubernetes/nexentastor-csi-driver-block.yaml:
 
 change the following line in controller service config
-
-
 ```
 kind: StatefulSet
 apiVersion: apps/v1
