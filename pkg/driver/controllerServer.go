@@ -6,7 +6,7 @@ import (
     "strings"
 
     "github.com/container-storage-interface/spec/lib/go/csi"
-    timestamp "github.com/golang/protobuf/ptypes/timestamp"
+    "github.com/golang/protobuf/ptypes"
     "github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
     "github.com/sirupsen/logrus"
     "golang.org/x/net/context"
@@ -876,8 +876,10 @@ func (s *ControllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSn
     if err != nil {
         return nil, err
     }
-    creationTime := &timestamp.Timestamp{
-        Seconds: createdSnapshot.CreationTime.Unix(),
+
+    creationTime, err := ptypes.TimestampProto(createdSnapshot.CreationTime)
+    if err != nil {
+        return nil, err
     }
 
     snapshotId := fmt.Sprintf("%s:%s", configName, snapshotPath)
@@ -1181,13 +1183,13 @@ func (s *ControllerServer) getVolumeSnapshotList(volumeId string, req *csi.ListS
 }
 
 func convertNSSnapshotToCSISnapshot(snapshot ns.Snapshot, configName string) *csi.ListSnapshotsResponse_Entry {
+    creationTime, _ := ptypes.TimestampProto(snapshot.CreationTime)
+
     return &csi.ListSnapshotsResponse_Entry{
         Snapshot: &csi.Snapshot{
             SnapshotId:     fmt.Sprintf("%s:%s", configName, snapshot.Path),
             SourceVolumeId: fmt.Sprintf("%s:%s", configName, snapshot.Parent),
-            CreationTime: &timestamp.Timestamp{
-                Seconds: snapshot.CreationTime.Unix(),
-            },
+            CreationTime: creationTime,
             ReadyToUse: true, //TODO use actual state
             //SizeByte: 0 //TODO size of zero means it is unspecified
         },
