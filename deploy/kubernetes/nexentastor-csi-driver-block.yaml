@@ -221,6 +221,7 @@ spec:
           args:
             - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
             - --volume-name-prefix=pvc-ns
+            - --feature-gates=Topology=true
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy
