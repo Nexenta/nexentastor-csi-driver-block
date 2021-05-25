@@ -188,7 +188,7 @@ func TestDriver_deploy(t *testing.T) {
 
 		k8sNginx, err := k8s.NewDeployment(k8s.DeploymentArgs{
 			RemoteClient: rc,
-			ConfigFile:   "./_configs/nginx-dynamic-volume-zone-1.yaml",
+			ConfigFile:   "./_configs/nginx-dynamic-volume.yaml",
 			Log:          l,
 		})
 		defer k8sNginx.CleanUp()
@@ -615,7 +615,7 @@ func TestDriver_deploy(t *testing.T) {
 
 		k8sNginx, err := k8s.NewDeployment(k8s.DeploymentArgs{
 			RemoteClient: rc,
-			ConfigFile:   "./_configs/nginx-dynamic-volume-zone-1.yaml",
+			ConfigFile:   "./_configs/nginx-dynamic-volume.yaml",
 			Log:          l,
 		})
 		defer k8sNginx.CleanUp()
