@@ -121,14 +121,14 @@ func (s *NodeServer) resolveNS(configName, volumeGroup string) (nsProvider ns.Pr
 func (s* NodeServer) ISCSILogInRescan(target, portal string) (error) {
     l := s.log.WithField("func", "ISCSILogInRescan()")
     cmd := exec.Command("iscsiadm", "-m", "discovery", "-t", "sendtargets", "-p", portal)
-    l.Infof("Executing command: %+v", cmd)
+    l.Debugf("Executing command: %+v", cmd)
     out, err := cmd.CombinedOutput()
     if err != nil {
         l.Errorf("iscsiadm discovery error: %+v", err)
         return err
     }
     cmd = exec.Command("iscsiadm", "-m", "node", "-T", target, "-p", portal, "-l")
-    l.Infof("Executing command: %+v", cmd)
+    l.Debugf("Executing command: %+v", cmd)
     out, err = cmd.CombinedOutput()
     if err != nil {
         if !strings.Contains(string(out), "already present") {
@@ -136,7 +136,7 @@ func (s* NodeServer) ISCSILogInRescan(target, portal string) (error) {
             // return err
         } else {
             cmd := exec.Command("iscsiadm", "-m", "node", "-T", target, "-p", portal, "--rescan")
-            l.Infof("Executing command: %+v", cmd)
+            l.Debugf("Executing command: %+v", cmd)
             _, err = cmd.CombinedOutput()
             if err != nil {
                 return err
@@ -149,7 +149,7 @@ func (s* NodeServer) ISCSILogInRescan(target, portal string) (error) {
 // getRealDeviceName - get device name (e.g. /dev/sdb) from a symlink
 func (s *NodeServer) GetRealDeviceName(symLink string) (string, error) {
     l := s.log.WithField("func", "GetRealDeviceName()")
-    l.Infof("Evaluating symLink: %s", symLink)
+    l.Debugf("Evaluating symLink: %s", symLink)
     devName, err := filepath.EvalSymlinks(fmt.Sprintf("/host/%s", symLink))
     if err != nil {
         l.Errorf("Could not evaluate symlink: %s, err: %+v", symLink, err)
@@ -158,7 +158,7 @@ func (s *NodeServer) GetRealDeviceName(symLink string) (string, error) {
     if strings.HasPrefix(devName, "/host") {
         devName = strings.TrimPrefix(devName, "/host")
     }
-    l.Infof("Device name is: %s", devName)
+    l.Debugf("Device name is: %s", devName)
     return devName, err
 }
 
@@ -175,7 +175,7 @@ func (s *NodeServer) RemoveDevice(devName string) (error) {
         return nil
     }
 
-    l.Infof("Attempting write to file: %s", filename)
+    l.Debugf("Attempting write to file: %s", filename)
     if written, err := f.WriteString("1"); err != nil {
         l.Warnf("Could not write to file %s. Error: %+v", filename, err.Error())
         f.Close()
@@ -187,6 +187,34 @@ func (s *NodeServer) RemoveDevice(devName string) (error) {
     }
 
     l.Infof("Successfully deleted device: %s", devName)
+    f.Close()
+    return nil
+}
+
+func (s *NodeServer) RescanDevice(devName string) (error) {
+    l := s.log.WithField("func", "RescanDevice()")
+    var (
+        f   *os.File
+        err error
+    )
+    filename := fmt.Sprintf("/sys/block%s/device/rescan", strings.TrimPrefix(devName, "/dev"))
+    if f, err = os.OpenFile(filename, os.O_APPEND | os.O_WRONLY, 0200); err != nil {
+        l.Warnf("Could not open file %s for writing, err: %+v", filename, err)
+        return nil
+    }
+
+    l.Debugf("Attempting write to file: %s", filename)
+    if written, err := f.WriteString("1"); err != nil {
+        l.Warnf("Could not write to file %s. Error: %+v", filename, err.Error())
+        f.Close()
+        return nil
+    } else if written == 0 {
+        l.Warnf("No data written to file %s.", filename)
+        f.Close()
+        return nil
+    }
+
+    l.Debugf("Successfully rescanned device: %s", devName)
     f.Close()
     return nil
 }
@@ -316,7 +344,7 @@ func (s *NodeServer) ParseVolumeContext(
     }
     numOfLunsPerTarget, err := strconv.Atoi(volumeContext["numOfLunsPerTarget"])
     if err != nil {
-        l.Infof("Could not parse numOfLunsPerTarget, setting default: %+v", DefaultNumOfLunsPerTarget)
+        l.Debugf("Could not parse numOfLunsPerTarget, setting default: %+v", DefaultNumOfLunsPerTarget)
         numOfLunsPerTarget = DefaultNumOfLunsPerTarget
     }
 
@@ -346,7 +374,7 @@ func (s *NodeServer) ParseVolumeContext(
     // Check if CHAP auth is enabled
     useChapAuth, err := strconv.ParseBool(volumeContext["useChapAuth"])
     if err != nil {
-        l.Infof("Could not parse useChapAuth, defaulting to %+v. Error: %+v", DefaultUseChapAuth, err)
+        l.Debugf("Could not parse useChapAuth, defaulting to %+v. Error: %+v", DefaultUseChapAuth, err)
         useChapAuth = DefaultUseChapAuth
     }
     if useChapAuth == true {
@@ -544,7 +572,7 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
     case *csi.VolumeCapability_Block:
         targetPath = filepath.Join(targetPath, "device")
         cmd := exec.Command("ln", "-s", source, targetPath)
-        l.Infof("Executing command: %+v", cmd)
+        l.Debugf("Executing command: %+v", cmd)
         _, err = cmd.CombinedOutput()
         if err != nil {
             return nil, err
@@ -575,7 +603,7 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
             "Volume %s is already formatted in %s, requested: %s,", volumeID, deviceFS, fsType)
     } else {
         cmd := exec.Command("e2fsck", "-f", "-y", source)
-        l.Infof("Executing command: %+v", cmd)
+        l.Debugf("Executing command: %+v", cmd)
         _, err = cmd.CombinedOutput()
         if err != nil {
             return nil, err
@@ -654,7 +682,7 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
     if strings.HasSuffix(targetPath, "/device") {
         symLink := filepath.Join(targetPath, "device")
         cmd := exec.Command("realpath", symLink)
-        l.Infof("Executing command: %+v", cmd)
+        l.Debugf("Executing command: %+v", cmd)
         out, err := cmd.CombinedOutput()
         if err != nil {
             l.Errorf("Command output: %+v", string(out))
@@ -763,7 +791,7 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     case *csi.VolumeCapability_Block:
         source = filepath.Join(source, "device")
         cmd := exec.Command("realpath", source)
-        l.Infof("Executing command: %+v", cmd)
+        l.Debugf("Executing command: %+v", cmd)
         out, err := cmd.CombinedOutput()
         if err != nil {
             l.Errorf("Command output: %+v", string(out))
@@ -771,7 +799,7 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
         }
         devName = strings.TrimSpace(string(out))
         cmd = exec.Command("ln", "-s", devName, targetPath)
-        l.Infof("Executing command: %+v", cmd)
+        l.Debugf("Executing command: %+v", cmd)
         _, err = cmd.CombinedOutput()
         if err != nil {
             return nil, err
@@ -779,10 +807,6 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
         l.Infof("Device %s published to %s successfully", devName, targetPath)
         return &csi.NodePublishVolumeResponse{}, nil
     case *csi.VolumeCapability_Mount:
-        // devName, err = s.GetRealDeviceName(source)
-        // if err != nil {
-        //     return nil, err
-        // }
         devName, err = s.DeviceFromTargetPath(source)
         if err != nil {
             return nil, err
@@ -822,7 +846,7 @@ func (s *NodeServer) CreateUpdateHostGroup(nsProvider ns.ProviderInterface) (nam
 
     hgUUID := uuid.New()
     name = fmt.Sprintf("%s-%s", HostGroupPrefix, hgUUID)
-    l.Infof("name: %v, nodeIQN: %v", name, nodeIQN)
+    l.Debugf("name: %v, nodeIQN: %v", name, nodeIQN)
     params := ns.CreateHostGroupParams{
         Name: name,
         Members: []string{nodeIQN},
@@ -888,7 +912,7 @@ func (s *NodeServer) mountVolume(devName, targetPath, fsType string, mountOption
         return nil
     }
 
-    l.Infof("target %v, fstype %v, mountOptions %v", targetPath, fsType, mountOptions)
+    l.Debugf("target %v, fstype %v, mountOptions %v", targetPath, fsType, mountOptions)
     err = mounter.Mount(fmt.Sprintf("/host%s", devName), targetPath, fsType, mountOptions)
     if err != nil {
         if os.IsPermission(err) {
@@ -915,19 +939,19 @@ func (s *NodeServer) formatVolume(device, fstype string) error {
     formatVolume := func() error {
 
         var err error
-        l.Infof("Trying to format %s via %s", device, fstype)
+        l.Debugf("Trying to format %s via %s", device, fstype)
         switch fstype {
         case "xfs":
             cmd := exec.Command("mkfs.xfs", "-K", "-f", device)
-            l.Infof("Executing command: %+v", cmd)
+            l.Debugf("Executing command: %+v", cmd)
             _, err = cmd.CombinedOutput()
         case "ext3":
             cmd := exec.Command("mkfs.ext3", "-E", "nodiscard", "-F", device)
-            l.Infof("Executing command: %+v", cmd)
+            l.Debugf("Executing command: %+v", cmd)
             _, err = cmd.CombinedOutput()
         case "ext4":
             cmd := exec.Command("mkfs.ext4", "-E", "nodiscard", "-F", device)
-            l.Infof("Executing command: %+v", cmd)
+            l.Debugf("Executing command: %+v", cmd)
             _, err = cmd.CombinedOutput()
         default:
             return fmt.Errorf("unsupported file system type: %s", fstype)
@@ -1099,6 +1123,45 @@ func (s *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 ) {
     l := s.log.WithField("func", "NodeExpandVolume()")
     l.Infof("request: '%+v'", protosanitizer.StripSecrets(req))
+
+    volumeID := req.GetVolumeId()
+    if len(volumeID) == 0 {
+        return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
+    }
+
+    targetPath := req.GetStagingTargetPath()
+    if len(targetPath) == 0 {
+        return nil, status.Error(codes.InvalidArgument, "Staging targetPath not provided")
+    }
+
+    volumeCapability := req.GetVolumeCapability()
+    if volumeCapability == nil {
+        return nil, status.Error(codes.InvalidArgument, "Volume capability not provided")
+    }
+
+    volumePath := req.GetVolumePath()
+    if len(volumePath) == 0 {
+        return nil, status.Error(codes.InvalidArgument, "Staging volumePath not provided")
+    }
+
+    err := s.RescanDevice(volumePath)
+    if err != nil {
+        return nil, err
+    }
+
+    switch volumeCapability.GetAccessType().(type) {
+    case *csi.VolumeCapability_Mount:
+
+        r := resizefs.NewResizeFs(&mount.SafeFormatAndMount{
+            Interface: mount.New(""),
+            Exec:      utilexec.New(),
+        })
+
+        if _, err := r.Resize(filepath.Join("/host", volumePath), targetPath); err != nil {
+            return nil, status.Errorf(
+                codes.Internal, "Could not resize volume %q (%q):  %v", volumeID, volumePath, err)
+        }
+    }
     return &csi.NodeExpandVolumeResponse{}, nil
 }
 
@@ -1106,12 +1169,12 @@ func (s *NodeServer) DeviceFromTargetPath(volumePath string) (deviceName string,
     l := s.log.WithField("func", "DeviceFromTargetPath()")
 
     cmd := exec.Command("findmnt", "-o", "source", "--noheadings", "--target", volumePath)
-    l.Infof("Executing command: %+v", cmd)
+    l.Debugf("Executing command: %+v", cmd)
     out, err := cmd.CombinedOutput()
     if err != nil {
         return "", status.Errorf(codes.Internal, "Could not determine device path: %v", err)
     } else {
-        l.Infof("Command output: %+v", string(out))
+        l.Debugf("Command output: %+v", string(out))
     }
     splittedOut := strings.Split(strings.TrimSpace(string(out)), "/host")
     if len(splittedOut) != 2 {
@@ -1124,12 +1187,12 @@ func (s *NodeServer) DeviceFromTargetPath(volumePath string) (deviceName string,
 func (s *NodeServer) getBlockSizeBytes(devicePath string) (int64, error) {
     l := s.log.WithField("func", "getBlockSizeBytes()")
     cmd := exec.Command("blockdev", "--getsize64", devicePath)
-    l.Infof("Executing command: %+v", cmd)
+    l.Debugf("Executing command: %+v", cmd)
     out, err := cmd.CombinedOutput()
     if err != nil {
         return -1, fmt.Errorf("error when getting size of block volume at path %s: output: %s, err: %v", devicePath, string(out), err)
     } else {
-        l.Infof("Command output: %+v", string(out))
+        l.Debugf("Command output: %+v", string(out))
     }
     strOut := strings.TrimSpace(string(out))
     gotSizeBytes, err := strconv.ParseInt(strOut, 10, 64)
@@ -1191,7 +1254,7 @@ func stringInArray(arr []string, tofind string) bool {
 func (s *NodeServer) getFSType(devName string) string {
     l := s.log.WithField("func", "getFSType()")
     cmd := exec.Command("blkid", devName)
-    l.Infof("Executing command: %+v", cmd)
+    l.Debugf("Executing command: %+v", cmd)
     out, err := cmd.CombinedOutput()
     fsType := ""
     if err != nil {

@@ -14,7 +14,7 @@
 # NexentaStor CSI Driver
 # ----------------------
 
-apiVersion: storage.k8s.io/v1beta1 #k8s =>1.14
+apiVersion: storage.k8s.io/v1 #k8s =>1.20
 kind: CSIDriver
 metadata:
   name: nexentastor-block-csi-driver.nexenta.com
@@ -42,6 +42,8 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: nexentastor-block-csi-controller-cluster-role
+  labels:
+    app.kubernetes.io/name: nexentastor-block-csi-controller
 rules:
   - apiGroups: ['']
     resources: ['secrets']
@@ -58,12 +60,6 @@ rules:
   - apiGroups: ['']
     resources: ['events']
     verbs: ['list', 'watch', 'create', 'update', 'patch']
-  - apiGroups: ['snapshot.storage.k8s.io']
-    resources: ['volumesnapshots']
-    verbs: ['get', 'list']
-  - apiGroups: ['snapshot.storage.k8s.io']
-    resources: ['volumesnapshotcontents']
-    verbs: ['get', 'list']
   # attacher specific
   - apiGroups: ['']
     resources: ['nodes']
@@ -84,6 +80,12 @@ rules:
   - apiGroups: ['snapshot.storage.k8s.io']
     resources: ['volumesnapshots']
     verbs: ['get', 'list', 'watch', 'update']
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots/status"]
+    verbs: ["update"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents/status"]
+    verbs: ["update"]
   - apiGroups: ['apiextensions.k8s.io']
     resources: ['customresourcedefinitions']
     verbs: ['create', 'list', 'watch', 'delete']
@@ -100,6 +102,8 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: nexentastor-block-csi-controller-cluster-role-binding
+  labels:
+    app.kubernetes.io/name: nexentastor-block-csi-controller
 subjects:
   - kind: ServiceAccount
     name: nexentastor-block-csi-controller-service-account
@@ -212,22 +216,22 @@ spec:
         # csi-provisioner: sidecar container that watches Kubernetes PersistentVolumeClaim objects
         # and triggers CreateVolume/DeleteVolume against a CSI endpoint
         - name: csi-provisioner
-          image: quay.io/k8scsi/csi-provisioner:v1.4.0
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v2.2.0
           imagePullPolicy: IfNotPresent
           args:
-            # - --connection-timeout=25s
-            - --provisioner=nexentastor-block-csi-driver.nexenta.com
             - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
             - --volume-name-prefix=pvc-ns
+            - --strict-topology
+            - --immediate-topology=false
             - --feature-gates=Topology=true
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy
         - name: csi-snapshotter
-          image: quay.io/k8scsi/csi-snapshotter:v1.1.0 # v1.2.0 doesn't work
+          image: k8s.gcr.io/sig-storage/csi-snapshotter:v4.1.1
           imagePullPolicy: IfNotPresent
           args:
-            - --connection-timeout=25s
+            - -v=3
             - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
           volumeMounts:
             - name: socket-dir

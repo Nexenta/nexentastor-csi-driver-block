@@ -1,0 +1,17 @@
+
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: nexentastor-block-csi-snapshot-class
+driver: nexentastor-block-csi-driver.nexenta.com
+deletionPolicy: Delete
+
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: snapshot-test-2
+spec:
+  volumeSnapshotClassName: nexentastor-block-csi-snapshot-class
+  source:
+    persistentVolumeClaimName: nexentastor-block-csi-driver-pvc-nginx-dynamic
