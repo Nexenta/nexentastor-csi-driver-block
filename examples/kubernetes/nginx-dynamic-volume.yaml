@@ -18,7 +18,9 @@ allowVolumeExpansion: true
 #   - key: topology.kubernetes.io/zone
 #     values:
 #     - zone-1
-# parameters:
+parameters:
+  # sparseVolume: "true"               # [optional] Defines whether the volumes should be created sparsed(thin)
+#   csi.storage.k8s.io/fstype: xfs
 #   configName: nstor-box3
   #dataset: customPool/customDataset # to overwrite "defaultDataset" config property [pool/dataset]
   #dataIp: 20.20.20.253              # to overwrite "defaultDataIp" config property
@@ -37,10 +39,10 @@ spec:
   accessModes:
     - ReadWriteMany
     # - ReadWriteOnce
-  volumeMode: Block
+  # volumeMode: Block
   resources:
     requests:
-      storage: 2Gi
+      storage: 1Gi
 ---
 # ---------
 # Nginx pod
@@ -58,10 +60,10 @@ spec:
       ports:
         - containerPort: 80
           protocol: TCP
-      # volumeMounts:
-      #   - mountPath: /mountedDisk
-      volumeDevices:
-        - devicePath: /dev/sdc
+      volumeMounts:
+        - mountPath: /mountedDisk
+      # volumeDevices:
+      #   - devicePath: /dev/sdc
           name: nexentastor-block-csi-driver-data
   volumes:
     - name: nexentastor-block-csi-driver-data

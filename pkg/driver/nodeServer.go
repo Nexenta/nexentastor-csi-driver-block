@@ -602,20 +602,28 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
         return nil, fmt.Errorf(
             "Volume %s is already formatted in %s, requested: %s,", volumeID, deviceFS, fsType)
     } else {
-        cmd := exec.Command("e2fsck", "-f", "-y", source)
-        l.Debugf("Executing command: %+v", cmd)
-        _, err = cmd.CombinedOutput()
-        if err != nil {
-            return nil, err
-        }
         r := resizefs.NewResizeFs(&mount.SafeFormatAndMount{
             Interface: mount.New(""),
             Exec:      utilexec.New(),
         })
 
         if _, err := r.Resize(source, targetPath); err != nil {
-            return nil, status.Errorf(
-                codes.Internal, "Could not resize volume %q (%q):  %v", volumeID, source, err)
+            if strings.Contains(err.Error(), "e2fsck") {
+                cmd := exec.Command("e2fsck", "-f", "-y", source)
+                l.Debugf("Executing command: %+v", cmd)
+                _, err = cmd.CombinedOutput()
+                if err != nil {
+                    return nil, err
+                }
+
+                if _, err = r.Resize(source, targetPath); err != nil {
+                    return nil, status.Errorf(
+                        codes.Internal, "Could not resize volume %q (%q):  %v", volumeID, source, err)
+                }
+            } else {
+                return nil, status.Errorf(
+                    codes.Internal, "Could not resize volume %q (%q):  %v", volumeID, source, err)
+            }
         }
     }
 
@@ -964,7 +972,7 @@ func (s *NodeServer) formatVolume(device, fstype string) error {
     }
 
     formatNotify := func(err error, duration time.Duration) {
-        l.Info("Format failed, retrying. Duration: %v", duration)
+        l.Info("Format failed, retrying. Duration: %+v", duration)
     }
 
     formatBackoff := backoff.NewExponentialBackOff()
@@ -1144,23 +1152,17 @@ func (s *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
         return nil, status.Error(codes.InvalidArgument, "Staging volumePath not provided")
     }
 
+    switch volumeCapability.GetAccessType().(type) {
+    case *csi.VolumeCapability_Mount:
+        var err error
+        volumePath, err = s.DeviceFromTargetPath(volumePath)
+        if err != nil {
+            return nil, err
+        }
+    }
     err := s.RescanDevice(volumePath)
     if err != nil {
         return nil, err
-    }
-
-    switch volumeCapability.GetAccessType().(type) {
-    case *csi.VolumeCapability_Mount:
-
-        r := resizefs.NewResizeFs(&mount.SafeFormatAndMount{
-            Interface: mount.New(""),
-            Exec:      utilexec.New(),
-        })
-
-        if _, err := r.Resize(filepath.Join("/host", volumePath), targetPath); err != nil {
-            return nil, status.Errorf(
-                codes.Internal, "Could not resize volume %q (%q):  %v", volumeID, volumePath, err)
-        }
     }
     return &csi.NodeExpandVolumeResponse{}, nil
 }

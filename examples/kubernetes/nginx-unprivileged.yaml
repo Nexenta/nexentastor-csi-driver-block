@@ -1,0 +1,69 @@
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nexentastor-block-csi-driver-sc-nginx-dynamic
+provisioner: nexentastor-block-csi-driver.nexenta.com
+allowVolumeExpansion: true
+# volumeBindingMode: Immediate
+# allowedTopologies:
+# - matchLabelExpressions:
+#   - key: topology.kubernetes.io/zone
+#     values:
+#     - zone-1
+# parameters:
+#   configName: nstor-box3
+  #dataset: customPool/customDataset # to overwrite "defaultDataset" config property [pool/dataset]
+  #dataIp: 20.20.20.253              # to overwrite "defaultDataIp" config property
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: nexentastor-block-claim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: nexentastor-block-csi-driver-sc-nginx-dynamic
+  resources:
+    requests:
+      storage: 4Gi
+---
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-unprivileged-nexentastor-block
+  labels:
+    app.kubernetes.io/name: nexentastor-block
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nexentastor-block
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nexentastor-block
+    spec:
+      securityContext:
+        runAsUser: 1001
+        fsGroup: 1001
+      automountServiceAccountToken: false
+      containers:
+      - name: nexentastor-block
+        image: nginxinc/nginx-unprivileged
+        imagePullPolicy: IfNotPresent
+        command: [ "/bin/bash", "-c", "--" ]
+        args: [ "while true; do echo $(date) > /var/lib/www/html/timefile; sleep 5; sync; done;" ]
+        volumeMounts:
+         - mountPath: /var/lib/www/html
+           name: pvc
+      volumes:
+      - name: pvc
+        persistentVolumeClaim:
+          claimName: nexentastor-block-claim
+
+
+

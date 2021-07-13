@@ -3,6 +3,7 @@ package driver
 import (
     "fmt"
     "path/filepath"
+    "strconv"
     "strings"
 
     "github.com/container-storage-interface/spec/lib/go/csi"
@@ -18,6 +19,7 @@ import (
 )
 
 const TopologyKeyZone = "topology.kubernetes.io/zone"
+const DefaultSparseVolume = true
 
 // supportedControllerCapabilities - driver controller capabilities
 var supportedControllerCapabilities = []csi.ControllerServiceCapability_RPC_Type{
@@ -323,16 +325,31 @@ func (s *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
     }
     nsProvider := resolveResp.nsProvider
 
-    l.Infof("expanding volume %+v to %+v bytes", volumePath, capacityBytes)
-    err = nsProvider.UpdateVolume(volumePath, ns.UpdateVolumeParams{
-        VolumeSize: capacityBytes,
-    })
+    // Check if volume was not already expanded
+    l.Debugf("Checking volume %s size", volumePath)
+    volInfo, err := nsProvider.GetVolume(volumePath)
     if err != nil {
-        return nil, fmt.Errorf("Failed to expand volume volume %s: %s", volumePath, err)
+        return nil, err
+    }
+    currentSize := volInfo.VolumeSize
+    l.Debugf("Current size of volume %s = %+v", volumePath, currentSize)
+
+    if currentSize < capacityBytes {
+        l.Infof("expanding volume %+v to %+v bytes", volumePath, capacityBytes)
+        err = nsProvider.UpdateVolume(volumePath, ns.UpdateVolumeParams{
+            VolumeSize: capacityBytes,
+        })
+        if err != nil {
+            return nil, fmt.Errorf("Failed to expand volume volume %s: %s", volumePath, err)
+        }
+        l.Debugf("expanded volume %+v successfully.", volumePath)
+        return &csi.ControllerExpandVolumeResponse{
+            CapacityBytes: capacityBytes,
+            NodeExpansionRequired: true,
+        }, nil
     }
     return &csi.ControllerExpandVolumeResponse{
         CapacityBytes: capacityBytes,
-        NodeExpansionRequired: true,
     }, nil
 }
 
@@ -443,6 +460,18 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
         configName = v
     }
 
+    sparseVolume := DefaultSparseVolume
+    if v, ok := reqParams["sparseVolume"]; ok {
+        sparseVolume, err = strconv.ParseBool(v)
+        if err != nil {
+            return nil, status.Errorf(
+                codes.InvalidArgument,
+                "Could not parse sparseVolume parameter = %s, error: %+v",
+                v, err.Error(),
+            )
+        }
+    }
+
     var sourceSnapshotId string
     var sourceVolumeId string
     var volumePath string
@@ -519,7 +548,7 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
         nsProvider = resolveResp.nsProvider
         volumeGroup = resolveResp.volumeGroup
         volumePath = filepath.Join(volumeGroup, volumeName)
-        err = s.createNewVolume(nsProvider, volumePath, capacityBytes)
+        err = s.createNewVolume(nsProvider, volumePath, capacityBytes, sparseVolume)
     }
 
     if err != nil {
@@ -633,6 +662,7 @@ func (s *ControllerServer) createNewVolume(
     nsProvider ns.ProviderInterface,
     volumePath string,
     capacityBytes int64,
+    sparseVolume bool,
 ) (error) {
     l := s.log.WithField("func", "createNewVolume()")
     l.Infof("nsProvider: %s, volumePath: %s", nsProvider, volumePath)
@@ -640,6 +670,7 @@ func (s *ControllerServer) createNewVolume(
     err := nsProvider.CreateVolume(ns.CreateVolumeParams{
         Path:                volumePath,
         VolumeSize:          capacityBytes,
+        SparseVolume:        sparseVolume,
     })
 
     if err != nil {
@@ -809,6 +840,20 @@ func (s *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolu
         return nil, err
     }
     nsProvider := resolveResp.nsProvider
+
+    lunMappingParams := ns.GetLunMappingsParams{
+        Volume: volumePath,
+    }
+    luns, err := nsProvider.GetLunMappings(lunMappingParams)
+    if err != nil {
+        return nil, err
+    }
+    for _, lun := range luns {
+        err = nsProvider.DestroyLunMapping(lun.Id)
+        if err != nil{
+            return nil, err
+        }
+    }
 
     // if here, than volumePath exists on some NS
     err = nsProvider.DestroyVolume(volumePath, ns.DestroyVolumeParams{
