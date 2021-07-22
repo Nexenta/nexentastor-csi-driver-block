@@ -601,30 +601,6 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
     } else if deviceFS != fsType {
         return nil, fmt.Errorf(
             "Volume %s is already formatted in %s, requested: %s,", volumeID, deviceFS, fsType)
-    } else {
-        r := resizefs.NewResizeFs(&mount.SafeFormatAndMount{
-            Interface: mount.New(""),
-            Exec:      utilexec.New(),
-        })
-
-        if _, err := r.Resize(source, targetPath); err != nil {
-            if strings.Contains(err.Error(), "e2fsck") {
-                cmd := exec.Command("e2fsck", "-f", "-y", source)
-                l.Debugf("Executing command: %+v", cmd)
-                _, err = cmd.CombinedOutput()
-                if err != nil {
-                    return nil, err
-                }
-
-                if _, err = r.Resize(source, targetPath); err != nil {
-                    return nil, status.Errorf(
-                        codes.Internal, "Could not resize volume %q (%q):  %v", volumeID, source, err)
-                }
-            } else {
-                return nil, status.Errorf(
-                    codes.Internal, "Could not resize volume %q (%q):  %v", volumeID, source, err)
-            }
-        }
     }
 
     var mountOptions []string
@@ -921,7 +897,7 @@ func (s *NodeServer) mountVolume(devName, targetPath, fsType string, mountOption
     }
 
     l.Debugf("target %v, fstype %v, mountOptions %v", targetPath, fsType, mountOptions)
-    err = mounter.Mount(fmt.Sprintf("/host%s", devName), targetPath, fsType, mountOptions)
+    err = mounter.Mount(devName, targetPath, fsType, mountOptions)
     if err != nil {
         if os.IsPermission(err) {
             l.Errorf("Failed to mount device %s. Error: %v", devName, err)
@@ -934,6 +910,7 @@ func (s *NodeServer) mountVolume(devName, targetPath, fsType string, mountOption
         l.Errorf("Failed to mount device %+v. Error: %v", devName, err)
         return status.Error(codes.Internal, err.Error())
     }
+
     return nil
 }
 
@@ -972,7 +949,7 @@ func (s *NodeServer) formatVolume(device, fstype string) error {
     }
 
     formatNotify := func(err error, duration time.Duration) {
-        l.Info("Format failed, retrying. Duration: %+v", duration)
+        l.Info("Format failed, retrying. Duration: ", duration)
     }
 
     formatBackoff := backoff.NewExponentialBackOff()
@@ -1154,16 +1131,29 @@ func (s *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
 
     switch volumeCapability.GetAccessType().(type) {
     case *csi.VolumeCapability_Mount:
-        var err error
-        volumePath, err = s.DeviceFromTargetPath(volumePath)
+        devName, err := s.DeviceFromTargetPath(volumePath)
+        if err != nil {
+            return nil, err
+        }
+        err = s.RescanDevice(devName)
+        if err != nil {
+            return nil, err
+        }
+        r := resizefs.NewResizeFs(&mount.SafeFormatAndMount{
+            Interface: mount.New(""),
+            Exec:      utilexec.New(),
+        })
+        if _, err = r.Resize(devName, volumePath); err != nil {
+            return nil, status.Errorf(
+                codes.Internal, "Could not resize volume %q (%q):  %v", volumeID, devName, err)
+        }
+    case *csi.VolumeCapability_Block:
+        err := s.RescanDevice(volumePath)
         if err != nil {
             return nil, err
         }
     }
-    err := s.RescanDevice(volumePath)
-    if err != nil {
-        return nil, err
-    }
+
     return &csi.NodeExpandVolumeResponse{}, nil
 }
 
@@ -1178,11 +1168,7 @@ func (s *NodeServer) DeviceFromTargetPath(volumePath string) (deviceName string,
     } else {
         l.Debugf("Command output: %+v", string(out))
     }
-    splittedOut := strings.Split(strings.TrimSpace(string(out)), "/host")
-    if len(splittedOut) != 2 {
-        return "", status.Error(codes.InvalidArgument, fmt.Sprintf("Device path is in wrong format: %s", string(out)))
-    }
-    devicePath := splittedOut[1]
+    devicePath := strings.TrimSpace(string(out))
     return devicePath, nil
 }
 

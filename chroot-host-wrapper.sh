@@ -10,4 +10,4 @@ if [ ! -d "${DIR}" ]; then
 fi
 
 #echo chroot /host /usr/bin/env -i PATH="/sbin:/bin:/usr/bin" ${ME} "${@:1}"
-exec chroot /host /usr/bin/env -i PATH="/sbin:/bin:/usr/bin" ${ME} "${@:1}"
+exec chroot /host /usr/bin/env -i PATH="/sbin:/bin:/usr/bin:/usr/sbin" ${ME} "${@:1}"

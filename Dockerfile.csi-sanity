@@ -53,7 +53,9 @@ RUN    ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-c
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.xfs \
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipath \
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/rm \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipathd 
+    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipathd \
+    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mount
+
 ENV PATH="/nexentastor-csi-driver-block/:${PATH}"
 # copy driver config file
 COPY ./tests/csi-sanity/driver-config-csi-sanity.yaml /config/driver-config-csi-sanity.yaml
