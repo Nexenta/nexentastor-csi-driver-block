@@ -340,7 +340,7 @@ func (s *ControllerServer) ControllerExpandVolume(ctx context.Context, req *csi.
             VolumeSize: capacityBytes,
         })
         if err != nil {
-            return nil, fmt.Errorf("Failed to expand volume volume %s: %s", volumePath, err)
+            return nil, fmt.Errorf("Failed to expand volume %s: %s", volumePath, err)
         }
         l.Debugf("expanded volume %+v successfully.", volumePath)
         return &csi.ControllerExpandVolumeResponse{

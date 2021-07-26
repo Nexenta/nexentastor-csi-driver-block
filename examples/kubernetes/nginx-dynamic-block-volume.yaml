@@ -19,11 +19,11 @@ allowVolumeExpansion: true
 #     values:
 #     - zone-1
 parameters:
-  # sparseVolume: "true"               # [optional] Defines whether the volumes should be created sparsed(thin)
+  sparseVolume: "true"               # [optional] Defines whether the volumes should be created sparsed(thin)
 #   csi.storage.k8s.io/fstype: xfs
 #   configName: nstor-box3
-  #dataset: customPool/customDataset # to overwrite "defaultDataset" config property [pool/dataset]
-  #dataIp: 20.20.20.253              # to overwrite "defaultDataIp" config property
+#   dataset: customPool/customDataset # to overwrite "defaultDataset" config property [pool/dataset]
+#   dataIp: 20.20.20.253              # to overwrite "defaultDataIp" config property
 ---
 
 # ------------------------------------------------
