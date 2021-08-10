@@ -61,6 +61,8 @@ github.com/Nexenta/go-nexentastor v2.5.67+incompatible h1:IL8ZpzohatZvINi07IzJub
 github.com/Nexenta/go-nexentastor v2.5.67+incompatible/go.mod h1:AeOU2WLKqHJqeeTfz2xCxx0jGuNKbhbrb6/SLOy53vo=
 github.com/Nexenta/go-nexentastor v2.6.0+incompatible h1:EKP045gSywoXv8IE/zVnLQ3reYGrjm+09Mo1n/9MuQ8=
 github.com/Nexenta/go-nexentastor v2.6.0+incompatible/go.mod h1:AeOU2WLKqHJqeeTfz2xCxx0jGuNKbhbrb6/SLOy53vo=
+github.com/Nexenta/go-nexentastor v2.6.1+incompatible h1:YRQNtj1zGHXTTUYEp/as0Ia2KDnG13HtmMOYYxYWHDY=
+github.com/Nexenta/go-nexentastor v2.6.1+incompatible/go.mod h1:AeOU2WLKqHJqeeTfz2xCxx0jGuNKbhbrb6/SLOy53vo=
 github.com/OpenPeeDeeP/depguard v1.0.0/go.mod h1:7/4sitnI9YlQgTLLk734QlzXT8DuHVnAyztLplQjk+o=
 github.com/OpenPeeDeeP/depguard v1.0.1 h1:VlW4R6jmBIv3/u1JNlawEvJMM4J+dPORPaZasQee8Us=
 github.com/OpenPeeDeeP/depguard v1.0.1/go.mod h1:xsIw86fROiiwelg+jB2uM9PiKihMMmUx/1V+TNhjQvM=
