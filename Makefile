@@ -58,19 +58,35 @@ build:
 
 .PHONY: container-build
 container-build:
+ifeq (${VERSION}, master)
 	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:${VERSION} --build-arg VERSION=${VERSION} .
+else
+	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:v${VERSION} --build-arg VERSION=v${VERSION} .
+endif
 
 .PHONY: container-push-local
 container-push-local:
+ifeq (${VERSION}, master)
 	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:${VERSION} --build-arg VERSION=${VERSION} .
 	docker tag  ${IMAGE_NAME}:${VERSION} ${REGISTRY_LOCAL}/${IMAGE_NAME}:${VERSION}
 	docker push ${REGISTRY_LOCAL}/${IMAGE_NAME}:${VERSION}
+else
+	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:v${VERSION} --build-arg VERSION=v${VERSION} .
+	docker tag  ${IMAGE_NAME}:v${VERSION} ${REGISTRY_LOCAL}/${IMAGE_NAME}:v${VERSION}
+	docker push ${REGISTRY_LOCAL}/${IMAGE_NAME}:v${VERSION}
+endif
 
 .PHONY: container-push-remote
 container-push-remote:
+ifeq (${VERSION}, master)
 	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:${VERSION} --build-arg VERSION=${VERSION} .
 	docker tag  ${IMAGE_NAME}:${VERSION} ${REGISTRY}/${IMAGE_NAME}:${VERSION}
 	docker push ${REGISTRY}/${IMAGE_NAME}:${VERSION}
+else
+	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:v${VERSION} --build-arg VERSION=v${VERSION} .
+	docker tag  ${IMAGE_NAME}:v${VERSION} ${REGISTRY}/${IMAGE_NAME}:v${VERSION}
+	docker push ${REGISTRY}/${IMAGE_NAME}:v${VERSION}
+endif
 
 .PHONY: test
 test: test-unit
