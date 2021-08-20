@@ -95,7 +95,7 @@ Releases can be found here - https://github.com/Nexenta/nexentastor-csi-driver-b
    ```
    **Note**: keyword nexentastor_map followed by cluster name of your choice MUST be used even if you are only using 1 NexentaStor cluster.
 
-   All driver configuration options:
+## Configuration options
 
    | Name                  | Description                                                     | Required   | Example                                                      |
    |-----------------------|-----------------------------------------------------------------|------------|--------------------------------------------------------------|
