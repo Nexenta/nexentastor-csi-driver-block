@@ -95,7 +95,7 @@ Releases can be found here - https://github.com/Nexenta/nexentastor-csi-driver-b
    ```
    **Note**: keyword nexentastor_map followed by cluster name of your choice MUST be used even if you are only using 1 NexentaStor cluster.
 
-   All driver configuration options:
+## Configuration options
 
    | Name                  | Description                                                     | Required   | Example                                                      |
    |-----------------------|-----------------------------------------------------------------|------------|--------------------------------------------------------------|
@@ -104,6 +104,7 @@ Releases can be found here - https://github.com/Nexenta/nexentastor-csi-driver-b
    | `password`            | NexentaStor REST API password                                   | yes        | `p@ssword`                                                   |
    | `defaultVolumeGroup`  | parent volumeGroup for driver's filesystemes [pool/volumeGroup] | yes        | `csiDriverPool/csiDriverVolumeGroup`                             |
    | `defaultHostGroup`    | NexentaStor host group to map volumes                           | no         | `all`   |
+   | `mountPointPermissions` | Permissions to be set on volume's mount point | no            | `0750`     |
    | `defaultTarget`       | NexentaStor iSCSI target iqn                                    | yes        | `iqn.2005-07.com.nexenta:01:csiTarget1`|
    | `defaultTargetGroup`  | NexentaStor target group name                                   | yes        | `CSI-tg1`   |
    | `sparseVolume`         | Defines whether sparse(thin provisioning) should be used. Default `true` | no       | `true`   |

@@ -56,9 +56,10 @@ const (
     DefaultISCSIPort = "3260"
     HostGroupPrefix = "csi"
     PathToInitiatorName = "/host/etc/iscsi/initiatorname.iscsi"
-    DefaultDynamicTargetLunAllocation = false
+    DefaultDynamicTargetLunAllocation = true
     DefaultNumOfLunsPerTarget = 256
     DefaultUseChapAuth = false
+    DefaultMountPointPermissions = 0750
 )
 
 
@@ -521,18 +522,25 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
     }
 
     device := ""
+    permissions, err := s.GetMountPointPermissions(volumeContext)
+    if err != nil {
+        return nil, err
+    }
     _, err = os.Stat(targetPath)
     if os.IsNotExist(err) {
-        if err = os.MkdirAll(filepath.Dir(targetPath), 0750); err != nil {
+        if err = os.MkdirAll(filepath.Dir(targetPath), permissions); err != nil {
             return nil, status.Error(codes.Internal, err.Error())
         }
     } else {
+        err = os.Chmod(targetPath, permissions)
+        if err != nil {
+            return nil, err
+        }
         device, err = s.DeviceFromTargetPath(targetPath)
         if err != nil {
             device = ""
         }
     }
-
     portal := fmt.Sprintf("%s:%s", dataIP, port)
     err = s.ISCSILogInRescan(iSCSITarget, portal)
     if err != nil {
@@ -609,7 +617,7 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
     }
 
     l.Infof("Mounting %s at %s with fstype %s", source, targetPath, fsType)
-    err = s.mountVolume(source, targetPath, fsType, mountOptions)
+    err = s.mountVolume(source, targetPath, fsType, mountOptions, permissions)
     if err != nil {
         return nil, err
     }
@@ -617,6 +625,23 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
     l.Infof("Device %s staged at %s", source, targetPath)
     return &csi.NodeStageVolumeResponse{}, nil
 }
+
+// GetMountPointPermissions - check if mountPoint persmissions were set in config or use default
+func (s *NodeServer) GetMountPointPermissions(volumeContext map[string]string) (os.FileMode, error) {
+    l := s.log.WithField("func", "GetMountPointPermissions()")
+    l.Infof("volumeContext: '%+v'", volumeContext)
+    mountPointPermissions := volumeContext["mountPointPermissions"]
+    if mountPointPermissions == "" {
+        l.Infof("mountPointPermissions is not set, using default: '%+v'", DefaultMountPointPermissions)
+        return os.FileMode(DefaultMountPointPermissions), nil
+    }
+    octalPerm, err := strconv.ParseInt(mountPointPermissions, 8, 16)
+    if err != nil {
+        return 0, err
+    }
+    return os.FileMode(octalPerm), nil
+}
+
 
 // NodeUnstageVolume - unstage volume
 func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (
@@ -762,10 +787,15 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     if volumeCapability == nil {
         return nil, status.Error(codes.InvalidArgument, "Volume capability not provided")
     }
+    permissions, err := s.GetMountPointPermissions(req.GetVolumeContext())
+    if err != nil {
+        return nil, err
+    }
+
     // Make dir if dir not present
     _, err := os.Stat(targetPath)
     if os.IsNotExist(err) {
-        if err = os.MkdirAll(filepath.Dir(targetPath), 0750); err != nil {
+        if err = os.MkdirAll(filepath.Dir(targetPath), permissions); err != nil {
             return nil, status.Error(codes.Internal, err.Error())
         }
     }
@@ -800,7 +830,7 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
         if req.GetReadonly() {
             mountOptions = append(mountOptions, "ro")
         }
-        err = s.mountVolume(devName, targetPath, fsType, mountOptions)
+        err = s.mountVolume(devName, targetPath, fsType, mountOptions, permissions)
         if err != nil {
             return nil, err
         }
@@ -872,15 +902,15 @@ func (s *NodeServer) CreateISCSIMapping(params CreateMappingParams, nsProvider n
     })
 }
 
-func (s *NodeServer) mountVolume(devName, targetPath, fsType string, mountOptions []string) error {
+func (s *NodeServer) mountVolume(devName, targetPath, fsType string, mountOptions []string, permissions os.FileMode) error {
     l := s.log.WithField("func", "mountVolume()")
-    l.Infof("Mounting device %s to targetPath %s", devName, targetPath)
+    l.Infof("Mounting device %s to targetPath %s with options %s", devName, targetPath, mountOptions)
 
     mounter := mount.New("")
     notMnt, err := mounter.IsLikelyNotMountPoint(targetPath)
     if err != nil {
         if os.IsNotExist(err) {
-            if err := os.MkdirAll(targetPath, 0750); err != nil {
+            if err := os.MkdirAll(targetPath, permissions); err != nil {
                 l.Errorf("Failed to mkdir to target path %s. Error: %s", targetPath, err)
                 return status.Error(codes.Internal, err.Error())
             }
@@ -909,6 +939,11 @@ func (s *NodeServer) mountVolume(devName, targetPath, fsType string, mountOption
         }
         l.Errorf("Failed to mount device %+v. Error: %v", devName, err)
         return status.Error(codes.Internal, err.Error())
+    }
+
+    err = os.Chmod(targetPath, permissions)
+    if err != nil {
+        return err
     }
 
     return nil
