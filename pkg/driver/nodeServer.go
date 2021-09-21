@@ -243,7 +243,8 @@ func (s *NodeServer) ResolveTargetGroup(params CreateTargetTgParams, nsProvider 
                 if err != nil {
                     return target, targetGroup, nil
                 }
-                if minLuns == 0 || len(luns) < minLuns {
+                if (minLuns == 0 || len(luns) < minLuns) && len(luns) < params.NumOfLunsPerTarget {
+                    minLuns = len(luns)
                     minTargetGroup = currentTg.Name
                     target = currentTarget
                 }
@@ -793,7 +794,7 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     }
 
     // Make dir if dir not present
-    _, err := os.Stat(targetPath)
+    _, err = os.Stat(targetPath)
     if os.IsNotExist(err) {
         if err = os.MkdirAll(filepath.Dir(targetPath), permissions); err != nil {
             return nil, status.Error(codes.Internal, err.Error())
