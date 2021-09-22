@@ -226,7 +226,7 @@ func (s *NodeServer) ResolveTargetGroup(params CreateTargetTgParams, nsProvider 
     err error,
 ) {
     l := s.log.WithField("func", "ResolveTargetGroup()")
-    l.Infof("params: '%+v'", params)
+    l.Infof("numOfLunsPerTarget: %+v, iSCSITargetPrefix: %+v", params.NumOfLunsPerTarget, params.ISCSITargetPrefix)
     targetGroups, err := nsProvider.GetTargetGroups()
     if err != nil {
         return target, targetGroup, nil
@@ -633,7 +633,8 @@ func (s *NodeServer) GetMountPointPermissions(volumeContext map[string]string) (
     l.Infof("volumeContext: '%+v'", volumeContext)
     mountPointPermissions := volumeContext["mountPointPermissions"]
     if mountPointPermissions == "" {
-        l.Infof("mountPointPermissions is not set, using default: '%+v'", DefaultMountPointPermissions)
+        l.Infof("mountPointPermissions is not set, using default: '%+v'", strconv.FormatInt(
+            int64(DefaultMountPointPermissions), 8))
         return os.FileMode(DefaultMountPointPermissions), nil
     }
     octalPerm, err := strconv.ParseInt(mountPointPermissions, 8, 16)

@@ -78,8 +78,8 @@ Releases can be found here - https://github.com/Nexenta/nexentastor-csi-driver-b
        password: Nexenta@1                                         # [required] NexentaStor REST API password
        defaultDataIp: 10.3.1.1                                     # default NexentaStor data IP or HA VIP
        defaultVolumeGroup: csiDriverPool/csiVolumeGroup            # default volume group for driver's volumes [pool/volumeGroup]
-       defaultTargetGroup: tg1                                     # [required] NexentaStor iSCSI target group name
-       defaultTarget: iqn.2005-07.com.nexenta:01:test              # [required] NexentaStor iSCSI target
+       defaultTargetGroup: tg1                                     # [required if dynamicTargetLunAllocation = false] NexentaStor iSCSI target group name
+       defaultTarget: iqn.2005-07.com.nexenta:01:test              # [required if dynamicTargetLunAllocation = false] NexentaStor iSCSI target
        defaultHostGroup: all                                       # [required] NexentaStor host group
 
      nstor-slow:
@@ -105,11 +105,11 @@ Releases can be found here - https://github.com/Nexenta/nexentastor-csi-driver-b
    | `defaultVolumeGroup`  | parent volumeGroup for driver's filesystemes [pool/volumeGroup] | yes        | `csiDriverPool/csiDriverVolumeGroup`                             |
    | `defaultHostGroup`    | NexentaStor host group to map volumes                           | no         | `all`   |
    | `mountPointPermissions` | Permissions to be set on volume's mount point | no            | `0750`     |
-   | `defaultTarget`       | NexentaStor iSCSI target iqn                                    | yes        | `iqn.2005-07.com.nexenta:01:csiTarget1`|
-   | `defaultTargetGroup`  | NexentaStor target group name                                   | yes        | `CSI-tg1`   |
+   | `defaultTarget`       | NexentaStor iSCSI target iqn                                    | yes if dynamicTargetLunAllocation = false | `iqn.2005-07.com.nexenta:01:csiTarget1`|
+   | `defaultTargetGroup`  | NexentaStor target group name                                   | yes if dynamicTargetLunAllocation = false | `CSI-tg1`   |
    | `sparseVolume`         | Defines whether sparse(thin provisioning) should be used. Default `true` | no       | `true`   |
    | `defaultDataIp`       | NexentaStor data IP or HA VIP for mounting shares               | yes for PV | `20.20.20.21`                                                |
-   | `dynamicTargetLunAllocation` | If true driver will automatically manage iSCSI target and targetgroup creation (default: false)| no         | `true` |
+   | `dynamicTargetLunAllocation` | If true driver will automatically manage iSCSI target and targetgroup creation. Config values for target and group will be ignored if dynamicTargetLunAllocation = true (default: true)| no         | `true` |
    | `numOfLunsPerTarget`  | Maximum number of luns that can be assigned to each target with dynamicTargetLunAllocation | no         | `256`                                                       |
    | `useChapAuth`         | CHAP authentication for iSCSI targets         | no             | `true`     |
    | `chapUser`            | Username for CHAP authentication                        | no             | `admin`    |
@@ -162,6 +162,60 @@ nexentastor-block-csi-node-wcrgk     2/2     Running   0          23h
 nexentastor-block-csi-node-xtmgv     2/2     Running   0          23h
 ```
 
+## Storage class parameters
+Storage classes provide the capability to define parameters per storageClass instead of using config values.
+This is very useful to provide flexibility while using the same driver.
+For example, we can use one storageClass to create thin provisioned and another for thick. Or use different iSCSI targets or volume groups.
+A couple of possible use cases:
+
+provide iSCSI target and group, thin provissioning (sparseVolume)
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nexentastor-block-csi-driver-static-target-tg
+provisioner: nexentastor-block-csi-driver.nexenta.com
+allowVolumeExpansion: true
+parameters:
+  dynamicTargetLunAllocation: false
+  target: iqn.2005-07.com.nexenta:01:csiTarget1
+  targetGroup: CSI-tg1
+  sparseVolume: true
+``` 
+
+let the driver take care of targets and groups, thick provisioning
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nexentastor-block-csi-driver-dynamicTargetLunAllocation
+provisioner: nexentastor-block-csi-driver.nexenta.com
+allowVolumeExpansion: true
+parameters:
+  dynamicTargetLunAllocation: true
+  numOfLunsPerTarget: "12"
+  iSCSITargetPrefix: csi-
+  sparseVolume: false
+``` 
+
+List of all valid parameters:
+- volumeGroup
+- configName
+- sparseVolume
+- dataIP
+- target
+- hostGroup
+- iSCSIPort
+- targetGroup
+- iSCSITargetPrefix
+- dynamicTargetLunAllocation
+- numOfLunsPerTarget
+- useChapAuth
+- chapUser
+- chapSecret
+- mountPointPermissions
+
+
 ## Usage
 
 ### Dynamically provisioned volumes
@@ -175,7 +229,7 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: nexentastor-csi-driver-block-sc-nginx-dynamic
-provisioner: nexentastor-csi-driver.nexenta.com
+provisioner: nexentastor-block-csi-driver.nexenta.com
 mountOptions:                        # list of options for `mount -o ...` command
 #  - noatime                         #
 #- matchLabelExpressions:            # use to following lines to configure topology by zones

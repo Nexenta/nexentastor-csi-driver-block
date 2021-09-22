@@ -1301,7 +1301,6 @@ func (s *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumes
         )
     }
 
-
     l.Infof("found %d entries(s)", len(entries))
 
     return &csi.ListVolumesResponse{
