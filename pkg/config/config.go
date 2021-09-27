@@ -41,6 +41,7 @@ type NsData struct {
     UseChapAuth                 string `yaml:"useChapAuth"`
     ChapUser                    string `yaml:"chapUser"`
     ChapSecret                  string `yaml:"chapSecret"`
+    MountPointPermissions       string `yaml:"mountPointPermissions"`
 }
 
 // GetFilePath - get filepath of found config file

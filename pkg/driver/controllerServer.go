@@ -627,6 +627,13 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
         chapSecret = cfg.ChapSecret
     }
 
+    mountPointPermissions := ""
+    if v, ok := reqParams["mountPointPermissions"]; ok {
+        mountPointPermissions = v
+    } else {
+        mountPointPermissions = cfg.MountPointPermissions
+    }
+
     res = &csi.CreateVolumeResponse{
         Volume: &csi.Volume{
             ContentSource: contentSource,
@@ -645,6 +652,7 @@ func (s *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolu
                 "useChapAuth": useChapAuth,
                 "chapUser": chapUser,
                 "chapSecret": chapSecret,
+                "mountPointPermissions": mountPointPermissions,
             },
         },
     }
@@ -1292,7 +1300,6 @@ func (s *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumes
             fmt.Sprintf("Failed to find filesystem started from token '%s': %s", startingToken, err),
         )
     }
-
 
     l.Infof("found %d entries(s)", len(entries))
 
