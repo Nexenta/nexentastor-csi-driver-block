@@ -273,7 +273,7 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: nexentastor-csi-driver-block-sc-nginx-persistent
-provisioner: nexentastor-csi-driver.nexenta.com
+provisioner: nexentastor-block-csi-driver.nexenta.com
 mountOptions:                        # list of options for `mount -o ...` command
 #  - noatime                         #
 parameters:
