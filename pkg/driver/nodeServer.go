@@ -231,6 +231,7 @@ func (s *NodeServer) ResolveTargetGroup(params CreateTargetTgParams, nsProvider 
     if err != nil {
         return target, targetGroup, nil
     }
+
     var minLuns int
     var minTargetGroup string
     for _, currentTg := range targetGroups {
@@ -442,9 +443,15 @@ func (s *NodeServer) SetChapAuth(name, chapUser, chapSecret string, nsProvider n
 }
 
 func (s *NodeServer) ConstructDevByPath(portal, iSCSITarget string, lunNumber int) (devByPath string) {
+    strLun := ""
+    if lunNumber > 255 {
+        strLun = strings.TrimSuffix(fmt.Sprintf("0x%04x%013d", lunNumber, 1), "1")
+    } else {
+        strLun = strconv.Itoa(lunNumber)
+    }
     return strings.Join([]string{
         "/dev/disk/by-path/ip", portal,
-        "iscsi", iSCSITarget, "lun", strconv.Itoa(lunNumber)}, "-")
+        "iscsi", iSCSITarget, "lun", strLun}, "-")
 }
 
 // NodeStageVolume - stage volume
@@ -500,12 +507,12 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
     }
 
     // Check if mapping already exists
-    params := ns.GetLunMappingsParams{
+    getLunParams := ns.GetLunMappingsParams{
         TargetGroup: targetGroup,
         Volume: volumePath,
         HostGroup: hostGroup,
     }
-    lunMappings, err := nsProvider.GetLunMappings(params)
+    lunMappings, err := nsProvider.GetLunMappings(getLunParams)
     if err != nil {
         return nil, err
     }
@@ -520,7 +527,12 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
         if err != nil {
             return nil, err
         }
+        lunMappings, err = nsProvider.GetLunMappings(getLunParams)
+        if err != nil {
+            return nil, err
+        }
     }
+    lunNumber := lunMappings[0].Lun
 
     device := ""
     permissions, err := s.GetMountPointPermissions(volumeContext)
@@ -548,19 +560,20 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
         return nil, err
     }
 
-    getLunResp, err := nsProvider.GetLunMapping(volumePath)
-    if err != nil{
-        return nil, err
-    }
-    lunNumber := getLunResp.Lun
     devByPath := s.ConstructDevByPath(portal, iSCSITarget, lunNumber)
     found := false
-    sleepTime := 100 * time.Millisecond
-    for ok := true; ok; ok = found {
-        if _, err := os.Stat(devByPath); os.IsNotExist(err) {
+    sleepTime := 500 * time.Millisecond
+    timeout := 60 * time.Second
+    for !found {
+        if sleepTime > timeout {
+            return nil, status.Error(codes.DeadlineExceeded, "Mount is nil in volume capability")
+        }
+        if _, err := os.Stat(filepath.Join("/host", devByPath)); os.IsNotExist(err) {
             l.Infof("Device %s not found, sleep %s", devByPath, sleepTime)
             time.Sleep(sleepTime)
+            sleepTime *= 2
         } else {
+            l.Infof("Device %s found", devByPath)
             found = true
         }
     }
