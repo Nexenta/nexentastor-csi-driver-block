@@ -198,11 +198,13 @@ release:
 		Are you sure? [y/N]: "
 	@(read ANSWER && case "$$ANSWER" in [yY]) true;; *) false;; esac)
 	git checkout -b ${VERSION}
+	sed -i 's/:master/:v$(VERSION)/g' deploy/kubernetes/nexentastor-csi-driver-block.yaml
 	docker login
 	make generate-changelog
 	make container-build
 	make container-push-remote
 	git add CHANGELOG.md
+	git add deploy/kubernetes/nexentastor-csi-driver-block.yaml
 	git commit -m "release v${VERSION}"
 	git push origin ${VERSION}
 	git tag v${VERSION}
