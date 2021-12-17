@@ -1,5 +1,5 @@
 # build container
-FROM golang:1.16 as builder
+FROM golang:1.17.4 as builder
 WORKDIR /go/src/github.com/Nexenta/nexentastor-csi-driver-block/
 COPY . ./
 ARG VERSION
@@ -42,5 +42,7 @@ RUN    ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-c
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/ln \
     && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mount
 
+RUN echo $'#!/usr/bin/env sh\nupdate-ca-certificates\n/nexentastor-csi-driver-block/nexentastor-csi-driver-block "$@";\n' > /init.sh
 ENV PATH="/nexentastor-csi-driver-block/:${PATH}"
-ENTRYPOINT ["/nexentastor-csi-driver-block/nexentastor-csi-driver-block"]
+RUN chmod +x /init.sh
+ENTRYPOINT ["/init.sh"]

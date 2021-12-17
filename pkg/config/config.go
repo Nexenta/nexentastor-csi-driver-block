@@ -12,6 +12,7 @@ import (
     "gopkg.in/yaml.v2"
 )
 
+const DefaultInsecureSkipVerify = true
 // NexentaStor address format
 var regexpAddress = regexp.MustCompile("^https?://[^:]+:[0-9]{1,5}$")
 
@@ -42,6 +43,7 @@ type NsData struct {
     ChapUser                    string `yaml:"chapUser"`
     ChapSecret                  string `yaml:"chapSecret"`
     MountPointPermissions       string `yaml:"mountPointPermissions"`
+    InsecureSkipVerify          *bool `yaml:"insecureSkipVerify,omitempty"`
 }
 
 // GetFilePath - get filepath of found config file
@@ -112,6 +114,12 @@ func (c *Config) Validate() error {
         }
         if data.Password == "" {
             errors = append(errors, fmt.Sprintf("parameter 'password' is missed"))
+        }
+
+        if data.InsecureSkipVerify == nil {
+            insecureSkipVerify := DefaultInsecureSkipVerify
+            data.InsecureSkipVerify = &insecureSkipVerify
+            c.NsMap[name] = data
         }
 
         if len(errors) != 0 {
