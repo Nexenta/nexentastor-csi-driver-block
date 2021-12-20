@@ -693,7 +693,6 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
             return nil, err
         } else {
             l.Infof("Lun mapping %s for volume %s not found, that's OK for deletion", getLunResp.Id, volumePath)
-            return &csi.NodeUnstageVolumeResponse{}, nil
         }
     } else {
         err = nsProvider.DestroyLunMapping(getLunResp.Id)
