@@ -18,7 +18,7 @@ import (
     "golang.org/x/sys/unix"
     "google.golang.org/grpc/codes"
     "google.golang.org/grpc/status"
-    "k8s.io/utils/mount"
+    "k8s.io/mount-utils"
     "k8s.io/kubernetes/pkg/util/resizefs"
     utilexec "k8s.io/utils/exec"
 
