@@ -134,7 +134,6 @@ func (s* NodeServer) ISCSILogInRescan(target, portal string) (error) {
     if err != nil {
         if !strings.Contains(string(out), "already present") {
             return status.Errorf(codes.Unauthenticated, "Was not able to login to target, err: %+v", err)
-            // return err
         } else {
             cmd := exec.Command("iscsiadm", "-m", "node", "-T", target, "-p", portal, "--rescan")
             l.Debugf("Executing command: %+v", cmd)
@@ -172,15 +171,13 @@ func (s *NodeServer) RemoveDevice(devName string) (error) {
     )
     filename := fmt.Sprintf("/host/sys/block%s/device/delete", strings.TrimPrefix(devName, "/dev"))
     if f, err = os.OpenFile(filename, os.O_APPEND | os.O_WRONLY, 0200); err != nil {
-        l.Warnf("Could not open file %s for writing, err: %+v", filename, err)
-        return nil
+        return err
     }
 
     l.Debugf("Attempting write to file: %s", filename)
     if written, err := f.WriteString("1"); err != nil {
-        l.Warnf("Could not write to file %s. Error: %+v", filename, err.Error())
         f.Close()
-        return nil
+        return err
     } else if written == 0 {
         l.Warnf("No data written to file %s.", filename)
         f.Close()
@@ -687,17 +684,18 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
         return nil, err
     }
 
+    var errors []error
     getLunResp, err := nsProvider.GetLunMapping(volumePath)
-    if err != nil{
+    if err != nil {
         if !ns.IsNotExistNefError(err) {
-            return nil, err
+            errors = append(errors, err)
         } else {
             l.Infof("Lun mapping %s for volume %s not found, that's OK for deletion", getLunResp.Id, volumePath)
         }
     } else {
         err = nsProvider.DestroyLunMapping(getLunResp.Id)
         if err != nil{
-            return nil, err
+            errors = append(errors, err)
         }
     }
 
@@ -709,12 +707,17 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
         out, err := cmd.CombinedOutput()
         if err != nil {
             l.Errorf("Command output: %+v", string(out))
-            return nil, err
+            errors = append(errors, err)
         }
         dev := strings.TrimSpace(string(out))
         err = s.RemoveDevice(dev)
         if err != nil {
-            return nil, err
+            errors = append(errors, err)
+        }
+        if len(errors) != 0 {
+            for _, error := range errors {
+                l.Errorf(error.Error())
+            }
         }
         if err := os.RemoveAll(targetPath); err != nil {
             if os.IsNotExist(err) {
@@ -730,46 +733,36 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
     // Mounted devices
     dev, err := s.DeviceFromTargetPath(targetPath)
     if err != nil {
-        if strings.Contains(err.Error(), "Could not determine device path") {
-            return &csi.NodeUnstageVolumeResponse{}, nil
-        }
-        return nil, err
+        errors = append(errors, err)
     }
 
     mounter := mount.New("")
     notMountPoint, err := mounter.IsLikelyNotMountPoint(targetPath)
     if err != nil {
+        errors = append(errors, err)
         if os.IsNotExist(err) {
-            l.Warnf("mount point '%s' already doesn't exist: '%s', return OK", targetPath, err)
-            return &csi.NodeUnstageVolumeResponse{}, nil
+            l.Warnf("mount point '%s' already doesn't exist: '%s'", targetPath, err)
         }
-        return nil, status.Errorf(
-            codes.Internal,
-            "Cannot ensure that targetPath '%s' is a mount point: '%s'",
-            targetPath,
-            err,
-        )
     }
-
-    if notMountPoint {
-        if err := os.RemoveAll(targetPath); err != nil {
-            l.Infof("Remove targetPath error: %s", err.Error())
+    if !notMountPoint {
+        if err := mounter.Unmount(targetPath); err != nil {
+            errors = append(errors, status.Errorf(codes.Internal, "Failed to unmount targetPath '%s': %s", targetPath, err))
         }
-        return &csi.NodeUnstageVolumeResponse{}, nil
-    }
-
-    if err := mounter.Unmount(targetPath); err != nil {
-        return nil, status.Errorf(codes.Internal, "Failed to unmount targetPath '%s': %s", targetPath, err)
     }
 
     err = s.RemoveDevice(dev)
     if err != nil {
-        return nil, err
+        errors = append(errors, err)
     }
-
+    if len(errors) != 0 {
+        for _, error := range errors {
+            l.Errorf(error.Error())
+        }
+    }
     if err := os.RemoveAll(targetPath); err != nil && !os.IsNotExist(err) {
         return nil, status.Errorf(codes.Internal, "Cannot remove unmounted target path '%s': %s", targetPath, err)
     }
+    l.Infof("Unstaged volume %s successfully", volumeID)
     return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
