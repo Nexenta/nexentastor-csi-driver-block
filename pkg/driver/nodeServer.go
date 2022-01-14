@@ -41,13 +41,18 @@ type CreateMappingParams struct {
     HostGroup   string
 }
 
-type CreateTargetTgParams struct {
-    Address             string
-    Port                string
-    Target              string
-    ISCSITargetPrefix   string
-    TargetGroup         string
-    NumOfLunsPerTarget  int
+type ISCSIVolumeContext struct {
+    Address                     string
+    Port                        string
+    ISCSITarget                 string
+    ISCSITargetPrefix           string
+    TargetGroup                 string
+    HostGroup                   string
+    ChapUser                    string
+    ChapSecret                  string
+    NumOfLunsPerTarget          int
+    UseChapAuth                 bool
+    DynamicTargetLunAllocation  bool
 }
 
 const (
@@ -76,7 +81,7 @@ func (s *NodeServer) refreshConfig(secret string) error {
                 Username:           cfg.Username,
                 Password:           cfg.Password,
                 Log:                s.log,
-                InsecureSkipVerify: true, //TODO move to config
+                InsecureSkipVerify: *cfg.InsecureSkipVerify,
             })
             if err != nil {
                 return fmt.Errorf("Cannot create NexentaStor resolver: %s", err)
@@ -218,12 +223,12 @@ func (s *NodeServer) RescanDevice(devName string) (error) {
 }
 
 // ResolveTargetGroup - find target with lowest lunmappings or create new one
-func (s *NodeServer) ResolveTargetGroup(params CreateTargetTgParams, nsProvider ns.ProviderInterface) (
+func (s *NodeServer) ResolveTargetGroup(parsedContext ISCSIVolumeContext, nsProvider ns.ProviderInterface) (
     target, targetGroup string,
     err error,
 ) {
     l := s.log.WithField("func", "ResolveTargetGroup()")
-    l.Infof("numOfLunsPerTarget: %+v, iSCSITargetPrefix: %+v", params.NumOfLunsPerTarget, params.ISCSITargetPrefix)
+    l.Infof("numOfLunsPerTarget: %+v, iSCSITargetPrefix: %+v", parsedContext.NumOfLunsPerTarget, parsedContext.ISCSITargetPrefix)
     targetGroups, err := nsProvider.GetTargetGroups()
     if err != nil {
         return target, targetGroup, nil
@@ -233,7 +238,7 @@ func (s *NodeServer) ResolveTargetGroup(params CreateTargetTgParams, nsProvider 
     var minTargetGroup string
     for _, currentTg := range targetGroups {
         for _, currentTarget := range currentTg.Members {
-            if strings.HasPrefix(currentTarget, params.ISCSITargetPrefix) {
+            if strings.HasPrefix(currentTarget, parsedContext.ISCSITargetPrefix) {
                 lunMappingParams := ns.GetLunMappingsParams{
                     TargetGroup: currentTg.Name,
                 }
@@ -241,7 +246,38 @@ func (s *NodeServer) ResolveTargetGroup(params CreateTargetTgParams, nsProvider 
                 if err != nil {
                     return target, targetGroup, nil
                 }
-                if (minLuns == 0 || len(luns) < minLuns) && len(luns) < params.NumOfLunsPerTarget {
+                if (minLuns == 0 || len(luns) < minLuns) && len(luns) < parsedContext.NumOfLunsPerTarget {
+                    // Additional logic for CHAP auth
+                    targetInfo, err := nsProvider.GetISCSITarget(currentTarget)
+                    if err != nil {
+                        return target, minTargetGroup, err
+                    }
+
+                    if parsedContext.UseChapAuth == true {
+                        // Check if currentTarget has CHAP enabled
+                        // Skip target if it does not
+                        if targetInfo.Authentication != "chap" {
+                            continue
+                        }
+                        // Check if auth matches, set otherwise
+                        nodeIQN, err := s.GetNodeIQN()
+                        if err != nil {
+                            return target, targetGroup, err
+                        }
+
+                        err = s.SetChapAuth(
+                            nodeIQN, parsedContext.ChapUser, parsedContext.ChapSecret, nsProvider)
+                        if err != nil {
+                            return target, targetGroup, err
+                        }
+                    } else {
+                        // Check if currentTarget has CHAP enabled
+                        // Skip target if it does
+                        if targetInfo.Authentication == "chap" {
+                            continue
+                        }
+                    }
+
                     minLuns = len(luns)
                     minTargetGroup = currentTg.Name
                     target = currentTarget
@@ -252,35 +288,35 @@ func (s *NodeServer) ResolveTargetGroup(params CreateTargetTgParams, nsProvider 
     if minTargetGroup != "" {
         return target, minTargetGroup, err
     } else {
-        return s.CreateNewTargetTg(params, nsProvider)
+        return s.CreateNewTargetTg(parsedContext, nsProvider)
     }
 }
 
-func (s *NodeServer) CreateNewTargetTg(params CreateTargetTgParams, nsProvider ns.ProviderInterface) (
+func (s *NodeServer) CreateNewTargetTg(parsedContext ISCSIVolumeContext, nsProvider ns.ProviderInterface) (
     target, targetGroup string,
     err error,
 ) {
     l := s.log.WithField("func", "CreateNewTargetTg()")
-    l.Infof("params: '%+v'", params)
-    if params.Target == "" {
+    l.Infof("context: '%+v'", parsedContext)
+    if parsedContext.ISCSITarget == "" {
         targetGroup = uuid.New().String()
-        target = fmt.Sprintf("%s:%s", params.ISCSITargetPrefix, targetGroup)
+        target = fmt.Sprintf("%s:%s", parsedContext.ISCSITargetPrefix, targetGroup)
     } else {
-        target = params.Target
-        if params.TargetGroup == "" {
+        target = parsedContext.ISCSITarget
+        if parsedContext.TargetGroup == "" {
             splittedTarget := strings.Split(target, ":")
             targetGroup = splittedTarget[len(splittedTarget) - 1]
         } else {
-            targetGroup = params.TargetGroup
+            targetGroup = parsedContext.TargetGroup
         }
     }
-    portInt, err := strconv.Atoi(params.Port)
+    portInt, err := strconv.Atoi(parsedContext.Port)
     if err != nil {
-        l.Errorf("Could not convert port to int, port: %s, err: %s", params.Port, err.Error())
+        l.Errorf("Could not convert port to int, port: %s, err: %s", parsedContext.Port, err.Error())
         return target, targetGroup, err
     }
     portal := ns.Portal{
-        Address: params.Address,
+        Address: parsedContext.Address,
         Port: portInt,
     }
     createTargetParams := ns.CreateISCSITargetParams{
@@ -300,107 +336,107 @@ func (s *NodeServer) CreateNewTargetTg(params CreateTargetTgParams, nsProvider n
     err = nsProvider.CreateUpdateTargetGroup(createTargetGroupParams)
     if err != nil {
     }
-    return target, targetGroup, err
-}
 
-func (s *NodeServer) ParseVolumeContext(
-    volumeContext map[string]string, nsProvider ns.ProviderInterface, configName string) (
-    hostGroup, targetGroup, port, dataIP, iSCSITarget string,
-    err error,
-) {
-    l := s.log.WithField("func", "ParseVolumeContext()")
-    cfg := s.config.NsMap[configName]
-    targetGroup = volumeContext["TargetGroup"]
-    iSCSITarget = volumeContext["Target"]
-    iSCSITargetPrefix := cfg.ISCSITargetPrefix
-
-    port = volumeContext["iSCSIPort"]
-    if port == "" {
-        if cfg.DefaultISCSIPort != "" {
-            port = cfg.DefaultISCSIPort
-        } else {
-            port = DefaultISCSIPort
-        }
-    }
-    if iSCSITargetPrefix == "" {
-        iSCSITargetPrefix = DefaultISCSITargetPrefix
-    }
-
-    hostGroup = volumeContext["HostGroup"]
-    if hostGroup == "" {
-        if cfg.DefaultHostGroup != "" {
-            hostGroup = cfg.DefaultHostGroup
-        } else {
-            hostGroup, err = s.CreateUpdateHostGroup(nsProvider)
-            if err != nil {
-                return hostGroup, targetGroup, port, dataIP, iSCSITarget, err
-            }
-        }
-    }
-
-    dataIP = volumeContext["dataIP"]
-    if dataIP == "" {
-        dataIP = cfg.DefaultDataIP
-    }
-    numOfLunsPerTarget, err := strconv.Atoi(volumeContext["numOfLunsPerTarget"])
-    if err != nil {
-        l.Debugf("Could not parse numOfLunsPerTarget, setting default: %+v", DefaultNumOfLunsPerTarget)
-        numOfLunsPerTarget = DefaultNumOfLunsPerTarget
-    }
-
-    params := CreateTargetTgParams{
-        Address: dataIP,
-        Port: port,
-        Target: iSCSITarget,
-        ISCSITargetPrefix: iSCSITargetPrefix,
-        NumOfLunsPerTarget: numOfLunsPerTarget,
-        TargetGroup: targetGroup,
-    }
-
-    dynamicTargetLunAllocation, err := strconv.ParseBool(volumeContext["dynamicTargetLunAllocation"])
-    if err != nil {
-        l.Infof("Could not parse dynamicTargetLunAllocation, defaulting to %+v. Error: %+v", DefaultDynamicTargetLunAllocation, err)
-        dynamicTargetLunAllocation = DefaultDynamicTargetLunAllocation
-    }
-    if dynamicTargetLunAllocation == true {
-        iSCSITarget, targetGroup, err = s.ResolveTargetGroup(params, nsProvider)
-        if err != nil {
-            return hostGroup, targetGroup, port, dataIP, iSCSITarget, err
-        }
-    } else {
-        iSCSITarget, targetGroup, err = s.CreateNewTargetTg(params, nsProvider)
-    }
-
-    // Check if CHAP auth is enabled
-    useChapAuth, err := strconv.ParseBool(volumeContext["useChapAuth"])
-    if err != nil {
-        l.Debugf("Could not parse useChapAuth, defaulting to %+v. Error: %+v", DefaultUseChapAuth, err)
-        useChapAuth = DefaultUseChapAuth
-    }
-    if useChapAuth == true {
+    if parsedContext.UseChapAuth == true {
         nodeIQN, err := s.GetNodeIQN()
         if err != nil {
-            return hostGroup, targetGroup, port, dataIP, iSCSITarget, err
+            return target, targetGroup, err
         }
-        err = s.SetChapAuth(nodeIQN, volumeContext["chapUser"], volumeContext["chapSecret"], nsProvider)
+
+        err = s.SetChapAuth(
+            nodeIQN, parsedContext.ChapUser, parsedContext.ChapSecret, nsProvider)
         if err != nil {
-            return hostGroup, targetGroup, port, dataIP, iSCSITarget, err
+            return target, targetGroup, err
         }
         // Set authentication to CHAP for iSCSI target
         updateParams := ns.UpdateISCSITargetParams{
             Authentication: "chap",
         }
-        err = nsProvider.UpdateISCSITarget(iSCSITarget, updateParams)
+        err = nsProvider.UpdateISCSITarget(target, updateParams)
         if err != nil {
-            return hostGroup, targetGroup, port, dataIP, iSCSITarget, err
+            return target, targetGroup, err
         }
     }
-    return hostGroup, targetGroup, port, dataIP, iSCSITarget, nil
+
+    return target, targetGroup, err
+}
+
+func (s *NodeServer) ParseVolumeContext(
+    volumeContext map[string]string, nsProvider ns.ProviderInterface, configName string) (
+    parsedContext ISCSIVolumeContext,
+    err error,
+) {
+    l := s.log.WithField("func", "ParseVolumeContext()")
+    cfg := s.config.NsMap[configName]
+    parsedContext.TargetGroup = volumeContext["TargetGroup"]
+    parsedContext.ISCSITarget = volumeContext["Target"]
+    parsedContext.ISCSITargetPrefix = cfg.ISCSITargetPrefix
+
+    parsedContext.Port = volumeContext["iSCSIPort"]
+    if parsedContext.Port == "" {
+        if cfg.DefaultISCSIPort != "" {
+            parsedContext.Port = cfg.DefaultISCSIPort
+        } else {
+            parsedContext.Port = DefaultISCSIPort
+        }
+    }
+    if parsedContext.ISCSITargetPrefix == "" {
+        parsedContext.ISCSITargetPrefix = DefaultISCSITargetPrefix
+    }
+
+    parsedContext.HostGroup = volumeContext["HostGroup"]
+    if parsedContext.HostGroup == "" {
+        if cfg.DefaultHostGroup != "" {
+            parsedContext.HostGroup = cfg.DefaultHostGroup
+        } else {
+            parsedContext.HostGroup, err = s.CreateUpdateHostGroup(nsProvider)
+            if err != nil {
+                return parsedContext, err
+            }
+        }
+    }
+
+    parsedContext.Address = volumeContext["dataIP"]
+    if parsedContext.Address == "" {
+        parsedContext.Address = cfg.DefaultDataIP
+    }
+    parsedContext.NumOfLunsPerTarget, err = strconv.Atoi(volumeContext["numOfLunsPerTarget"])
+    if err != nil {
+        l.Debugf("Could not parse numOfLunsPerTarget, setting default: %+v", DefaultNumOfLunsPerTarget)
+        parsedContext.NumOfLunsPerTarget = DefaultNumOfLunsPerTarget
+    }
+
+    parsedContext.UseChapAuth, err = strconv.ParseBool(volumeContext["useChapAuth"])
+    if err != nil {
+        l.Debugf("Could not parse useChapAuth, defaulting to %+v. Error: %+v", DefaultUseChapAuth, err)
+        parsedContext.UseChapAuth = DefaultUseChapAuth
+    }
+
+    if parsedContext.UseChapAuth == true {
+        if v, ok := volumeContext["chapUser"]; ok {
+            parsedContext.ChapUser = v
+        } else {
+            return parsedContext, fmt.Errorf("useChapAuth is set to true, but chapUser is not set")
+        }
+
+        if v, ok := volumeContext["chapSecret"]; ok {
+            parsedContext.ChapSecret = v
+        } else {
+            return parsedContext, fmt.Errorf("useChapAuth is set to true, but chapSecret is not set")
+        }
+    }
+
+    parsedContext.DynamicTargetLunAllocation, err = strconv.ParseBool(volumeContext["dynamicTargetLunAllocation"])
+    if err != nil {
+        l.Infof("Could not parse dynamicTargetLunAllocation, defaulting to %+v. Error: %+v", DefaultDynamicTargetLunAllocation, err)
+        parsedContext.DynamicTargetLunAllocation = DefaultDynamicTargetLunAllocation
+    }
+    return parsedContext, nil
 }
 
 func (s *NodeServer) SetChapAuth(name, chapUser, chapSecret string, nsProvider ns.ProviderInterface) (err error) {
     l := s.log.WithField("func", "SetChapAuth()")
-    l.Warnf("params: name: %+v, chapUser: %+v, chapSecret: %+v", name, chapUser, chapSecret)
+    l.Infof("params: name: %+v, chapUser: %+v, chapSecret: %+v", name, chapUser, chapSecret)
     if name == "" {
         return status.Error(codes.InvalidArgument, "iSCSI IQN not provided")
     }
@@ -497,17 +533,27 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
         return nil, err
     }
 
-    hostGroup, targetGroup, port, dataIP, iSCSITarget, err := s.ParseVolumeContext(
+    parsedContext, err := s.ParseVolumeContext(
         volumeContext, nsProvider, configName)
     if err != nil {
         return nil, err
+    }
+
+    var iSCSITarget, targetGroup string
+    if parsedContext.DynamicTargetLunAllocation == true {
+        iSCSITarget, targetGroup, err = s.ResolveTargetGroup(parsedContext, nsProvider)
+        if err != nil {
+            return nil, err
+        }
+    } else {
+        iSCSITarget, targetGroup, err = s.CreateNewTargetTg(parsedContext, nsProvider)
     }
 
     // Check if mapping already exists
     getLunParams := ns.GetLunMappingsParams{
         TargetGroup: targetGroup,
         Volume: volumePath,
-        HostGroup: hostGroup,
+        HostGroup: parsedContext.HostGroup,
     }
     lunMappings, err := nsProvider.GetLunMappings(getLunParams)
     if err != nil {
@@ -518,7 +564,7 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
         params := CreateMappingParams{
             TargetGroup: targetGroup,
             VolumePath: volumePath,
-            HostGroup: hostGroup,
+            HostGroup: parsedContext.HostGroup,
         }
         err = s.CreateISCSIMapping(params, nsProvider)
         if err != nil {
@@ -529,8 +575,12 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
             return nil, err
         }
     }
-    lunNumber := lunMappings[0].Lun
 
+    portal := fmt.Sprintf("%s:%s", parsedContext.Address, parsedContext.Port)
+    err = s.ISCSILogInRescan(iSCSITarget, portal)
+    if err != nil {
+        return nil, err
+    }
     device := ""
     permissions, err := s.GetMountPointPermissions(volumeContext)
     if err != nil {
@@ -551,12 +601,8 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
             device = ""
         }
     }
-    portal := fmt.Sprintf("%s:%s", dataIP, port)
-    err = s.ISCSILogInRescan(iSCSITarget, portal)
-    if err != nil {
-        return nil, err
-    }
 
+    lunNumber := lunMappings[0].Lun
     devByPath := s.ConstructDevByPath(portal, iSCSITarget, lunNumber)
     found := false
     sleepTime := 500 * time.Millisecond
@@ -1244,7 +1290,7 @@ func NewNodeServer(driver *Driver) (*NodeServer, error) {
             Username:           cfg.Username,
             Password:           cfg.Password,
             Log:                l,
-            InsecureSkipVerify: true, //TODO move to config
+            InsecureSkipVerify: *cfg.InsecureSkipVerify,
         })
         if err != nil {
             return nil, fmt.Errorf("Cannot create NexentaStor resolver: %s", err)
