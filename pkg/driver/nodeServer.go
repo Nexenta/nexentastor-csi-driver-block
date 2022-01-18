@@ -81,7 +81,7 @@ func (s *NodeServer) refreshConfig(secret string) error {
                 Username:           cfg.Username,
                 Password:           cfg.Password,
                 Log:                s.log,
-                InsecureSkipVerify: true, //TODO move to config
+                InsecureSkipVerify: *cfg.InsecureSkipVerify,
             })
             if err != nil {
                 return fmt.Errorf("Cannot create NexentaStor resolver: %s", err)
@@ -1290,7 +1290,7 @@ func NewNodeServer(driver *Driver) (*NodeServer, error) {
             Username:           cfg.Username,
             Password:           cfg.Password,
             Log:                l,
-            InsecureSkipVerify: true, //TODO move to config
+            InsecureSkipVerify: *cfg.InsecureSkipVerify,
         })
         if err != nil {
             return nil, fmt.Errorf("Cannot create NexentaStor resolver: %s", err)
