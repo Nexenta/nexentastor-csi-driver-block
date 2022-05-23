@@ -1,0 +1,11 @@
+nexentastor_map:
+  nstor-box1:
+    restIp: https://10.3.199.190:8443
+    username: admin
+    password: Nexenta@1
+    defaultDataIp: 10.3.199.192
+    defaultVolumeGroup: qa/csiVolumeGroup
+    defaultTargetGroup: tg01
+    defaultTarget: iqn.2005-07.com.nexenta:01:stress-test
+    defaultHostGroup: all
+debug: true
