@@ -5,6 +5,7 @@ import (
     "path/filepath"
     "strconv"
     "strings"
+    "time"
 
     "github.com/container-storage-interface/spec/lib/go/csi"
     "github.com/golang/protobuf/ptypes"
@@ -30,6 +31,7 @@ var supportedControllerCapabilities = []csi.ControllerServiceCapability_RPC_Type
     csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
     csi.ControllerServiceCapability_RPC_GET_CAPACITY,
     csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
+    csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
 }
 
 // supportedVolumeCapabilities - driver volume capabilities
@@ -1319,22 +1321,102 @@ func (s *ControllerServer) ListVolumes(ctx context.Context, req *csi.ListVolumes
     }, nil
 }
 
-// ControllerPublishVolume - not supported
 func (s *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (
     *csi.ControllerPublishVolumeResponse,
     error,
 ) {
-    s.log.WithField("func", "ControllerPublishVolume()").Warnf("request: '%+v' - not implemented", req)
-    return nil, status.Error(codes.Unimplemented, "")
+    l := s.log.WithField("func", "ControllerPublishVolume()")
+    l.Infof("request: '%+v'", protosanitizer.StripSecrets(req))
+
+    // All attach operations are done in nodeStageVolume.
+
+    return &csi.ControllerPublishVolumeResponse{}, nil
 }
 
-// ControllerUnpublishVolume - not supported
 func (s *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (
     *csi.ControllerUnpublishVolumeResponse,
     error,
 ) {
-    s.log.WithField("func", "ControllerUnpublishVolume()").Warnf("request: '%+v' - not implemented", req)
-    return nil, status.Error(codes.Unimplemented, "")
+    l := s.log.WithField("func", "ControllerUnpublishVolume()")
+    l.Infof("request: '%+v'", protosanitizer.StripSecrets(req))
+
+    var secret string
+    secrets := req.GetSecrets()
+    for _, v := range secrets {
+        secret = v
+    }
+    err := s.refreshConfig(secret)
+    if err != nil {
+        return nil, status.Errorf(codes.FailedPrecondition, "Cannot use config file: %s", err)
+    }
+
+    volumeId := req.GetVolumeId()
+    if len(volumeId) == 0 {
+        return nil, status.Error(codes.InvalidArgument, "Volume ID must be provided")
+    }
+    splittedVol := strings.Split(volumeId, ":")
+    if len(splittedVol) != 2 {
+        l.Infof("Got wrong volumeId, but that is OK for deletion")
+        return &csi.ControllerUnpublishVolumeResponse{}, nil
+    }
+    configName, volumePath := splittedVol[0], splittedVol[1]
+
+    splittedPath := strings.Split(volumePath, "/")
+    if len(splittedPath) != 3 {
+        l.Infof("Got wrong volumeId, but that is OK for deletion")
+        return &csi.ControllerUnpublishVolumeResponse{}, nil
+    }
+    volumeGroup := strings.Join(splittedPath[:2], "/")
+
+    params := ResolveNSParams{
+        volumeGroup: volumeGroup,
+        configName: configName,
+    }
+    resolveResp, err := s.resolveNS(params)
+    if err != nil {
+        if status.Code(err) == codes.NotFound {
+            l.Infof("volume '%s' not found, that's OK for deletion request", volumePath)
+            return &csi.ControllerUnpublishVolumeResponse{}, nil
+        }
+        return nil, err
+    }
+    nsProvider := resolveResp.nsProvider
+
+    lunMappingParams := ns.GetLunMappingsParams{
+        Volume: volumePath,
+    }
+    luns, err := nsProvider.GetLunMappings(lunMappingParams)
+    if err != nil {
+        return nil, err
+    }
+    for _, lun := range luns {
+        err = nsProvider.DestroyLunMapping(lun.Id)
+        if err != nil{
+            return nil, err
+        }
+    }
+
+    luns, err = nsProvider.GetLunMappings(lunMappingParams)
+    if err != nil {
+        return nil, err
+    }
+
+    timeout := 60
+    sleepTime := 2
+
+    for len(luns) > 0 {
+        if sleepTime > timeout {
+            return nil, status.Errorf(codes.DeadlineExceeded, "Luns did not get deleted in %v seconds", sleepTime)
+        }
+        sleepTime = sleepTime + 1
+        time.Sleep(time.Second * time.Duration(sleepTime))
+        luns, err = nsProvider.GetLunMappings(lunMappingParams)
+        if err != nil {
+            return nil, err
+        }
+    }
+
+    return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
 // ControllerGetCapabilities - controller capabilities

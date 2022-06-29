@@ -19,8 +19,8 @@ kind: CSIDriver
 metadata:
   name: nexentastor-block-csi-driver.nexenta.com
 spec:
-  attachRequired: false
-  podInfoOnMount: false
+  attachRequired: true
+  podInfoOnMount: true
 ---
 
 
@@ -69,7 +69,10 @@ rules:
     verbs: ['get', 'list', 'watch']
   - apiGroups: ['storage.k8s.io']
     resources: ['volumeattachments']
-    verbs: ['get', 'list', 'watch', 'update']
+    verbs: ['get', 'list', 'watch', 'update', 'patch']
+  - apiGroups: ['storage.k8s.io']
+    resources: ['volumeattachments/status']
+    verbs: ['get', 'list', 'watch', 'update', 'patch']
   # snapshotter specific
   - apiGroups: ['snapshot.storage.k8s.io']
     resources: ['volumesnapshotclasses']
@@ -201,7 +204,6 @@ apiVersion: apps/v1
 metadata:
   name: nexentastor-block-csi-controller
 spec:
-  # serviceName: nexentastor-block-csi-controller-service
   replicas: 1
   selector:
     matchLabels:
@@ -211,6 +213,22 @@ spec:
       labels:
         app: nexentastor-block-csi-controller
     spec:
+      # uncomment and reconfigure tolerations and affinity if you need controller
+      # to be scheduled on a master/tainted node
+
+      # tolerations:
+      #   - key: "node-role.kubernetes.io/master"
+      #     operator: "Exists"
+      #     effect: "NoSchedule"
+      # affinity:
+      #   nodeAffinity:
+      #     requiredDuringSchedulingIgnoredDuringExecution:
+      #       nodeSelectorTerms:
+      #       - matchExpressions:
+      #         - key: role
+      #           operator: In
+      #           values:
+      #           - master
       serviceAccount: nexentastor-block-csi-controller-service-account
       containers:
         # csi-provisioner: sidecar container that watches Kubernetes PersistentVolumeClaim objects
@@ -229,6 +247,21 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy
+        # csi-attacher: idecar container that controls volume attachments and calls
+        # controllerPublishVolume and controllerUnpublishVolume
+        - name: csi-attacher
+          image: k8s.gcr.io/sig-storage/csi-attacher:v3.5.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --csi-address=$(ADDRESS)
+            - --v=2
+            - --leader-election=true
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-snapshotter
           image: k8s.gcr.io/sig-storage/csi-snapshotter:v5.0.1
           imagePullPolicy: IfNotPresent
