@@ -1328,8 +1328,48 @@ func (s *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi
     l := s.log.WithField("func", "ControllerPublishVolume()")
     l.Infof("request: '%+v'", protosanitizer.StripSecrets(req))
 
-    // All attach operations are done in nodeStageVolume.
+    volCap := req.GetVolumeCapability()
+    if volCap == nil {
+        return nil, status.Error(codes.InvalidArgument, "Volume capability not provided")
+    }
 
+    volumeID := req.GetVolumeId()
+    if len(volumeID) == 0 {
+        return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
+    }
+
+    nodeID := req.GetNodeId()
+    if len(nodeID) == 0 {
+        return nil, status.Error(codes.InvalidArgument, "Node ID not provided")
+    }
+
+    splittedVol := strings.Split(volumeID, ":")
+    if len(splittedVol) != 2 {
+        return nil, status.Error(codes.NotFound, fmt.Sprintf("VolumeId is in wrong format: %s", volumeID))
+    }
+    configName, volumePath := splittedVol[0], splittedVol[1]
+    cfg := s.config.NsMap[configName]
+
+    params := ResolveNSParams{
+        volumeGroup: cfg.DefaultVolumeGroup,
+        configName: configName,
+    }
+    response, err := s.resolveNS(params)
+    nsProvider := response.nsProvider
+    if err != nil {
+        return nil, err
+    }
+    _, err = nsProvider.GetVolume(volumePath)
+    if err != nil {
+        l.Warnf("GetVolume ERROR: %+v", err)
+        return nil, status.Errorf(codes.NotFound, "Volume %v not found on NexentaStor", volumePath)
+    }
+
+    if strings.Contains(nodeID, "fake-node") {
+        return nil, status.Errorf(codes.NotFound, "Incorrect node: %v", nodeID)
+    }
+
+    // All attach operations are done in nodeStageVolume.
     return &csi.ControllerPublishVolumeResponse{}, nil
 }
 
