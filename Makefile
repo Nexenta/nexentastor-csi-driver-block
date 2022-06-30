@@ -103,8 +103,8 @@ test-unit-container:
 # run e2e k8s tests using image from local docker registry
 .PHONY: test-e2e-k8s-local-image
 test-e2e-k8s-local-image: check-env-TEST_K8S_IP
-	sed -e "s/image: nexenta/image: ${REGISTRY_LOCAL}/g" \
-		./deploy/kubernetes/nexentastor-csi-driver-block.yaml > /tmp/nexentastor-csi-driver-block-local.yaml
+	sed -e "s/image: nexenta\/nexentastor-csi-driver-block:master/image: ${REGISTRY_LOCAL}\/nexentastor-csi-driver-block:v${VERSION}/g" \
+	       	./deploy/kubernetes/nexentastor-csi-driver-block.yaml > /tmp/nexentastor-csi-driver-block-local.yaml
 	go test -timeout 20m tests/e2e/driver_test.go -v -count 1 \
 		--k8sConnectionString="root@${TEST_K8S_IP}" \
 		--k8sDeploymentFile="/tmp/nexentastor-csi-driver-block-local.yaml" \
