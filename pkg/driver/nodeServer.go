@@ -179,18 +179,16 @@ func (s *NodeServer) RemoveDevice(devName string) (error) {
         return err
     }
 
+    defer f.Close()
     l.Debugf("Attempting write to file: %s", filename)
     if written, err := f.WriteString("1"); err != nil {
-        f.Close()
         return err
     } else if written == 0 {
         l.Warnf("No data written to file %s.", filename)
-        f.Close()
         return nil
     }
 
     l.Infof("Successfully deleted device: %s", devName)
-    f.Close()
     return nil
 }
 
@@ -731,20 +729,6 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
     }
 
     var errors []error
-    getLunResp, err := nsProvider.GetLunMapping(volumePath)
-    if err != nil {
-        if !ns.IsNotExistNefError(err) {
-            errors = append(errors, err)
-        } else {
-            l.Infof("Lun mapping %s for volume %s not found, that's OK for deletion", getLunResp.Id, volumePath)
-        }
-    } else {
-        err = nsProvider.DestroyLunMapping(getLunResp.Id)
-        if err != nil{
-            errors = append(errors, err)
-        }
-    }
-
     // Raw block devices
     if strings.HasSuffix(targetPath, "/device") {
         symLink := filepath.Join(targetPath, "device")
@@ -808,6 +792,21 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
     if err := os.RemoveAll(targetPath); err != nil && !os.IsNotExist(err) {
         return nil, status.Errorf(codes.Internal, "Cannot remove unmounted target path '%s': %s", targetPath, err)
     }
+
+    getLunResp, err := nsProvider.GetLunMapping(volumePath)
+    if err != nil {
+        if !ns.IsNotExistNefError(err) {
+            errors = append(errors, err)
+        } else {
+            l.Infof("Lun mapping %s for volume %s not found, that's OK for deletion", getLunResp.Id, volumePath)
+        }
+    } else {
+        err = nsProvider.DestroyLunMapping(getLunResp.Id)
+        if err != nil{
+            errors = append(errors, err)
+        }
+    }
+
     l.Infof("Unstaged volume %s successfully", volumeID)
     return &csi.NodeUnstageVolumeResponse{}, nil
 }
