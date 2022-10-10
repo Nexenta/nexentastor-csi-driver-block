@@ -174,14 +174,33 @@ func (s *NodeServer) RemoveDevice(devName string) (error) {
         f   *os.File
         err error
     )
-    filename := fmt.Sprintf("/host/sys/block%s/device/delete", strings.TrimPrefix(devName, "/dev"))
+
+    filename := fmt.Sprintf("/host/sys/block%s/device/state", strings.TrimPrefix(devName, "/dev"))
     if f, err = os.OpenFile(filename, os.O_APPEND | os.O_WRONLY, 0200); err != nil {
+        l.Errorf("Error while opening file %v: %v\n", filename, err.Error())
         return err
     }
 
     defer f.Close()
-    l.Debugf("Attempting write to file: %s", filename)
-    if written, err := f.WriteString("1"); err != nil {
+    dataString := "offline\n"
+    l.Debugf("Attempting to write '%s' to file: %s", dataString, filename)
+    if written, err := f.WriteString(dataString); err != nil {
+        return err
+    } else if written == 0 {
+        l.Warnf("No data written to file %s.", filename)
+        return nil
+    }
+
+    filename = fmt.Sprintf("/host/sys/block%s/device/delete", strings.TrimPrefix(devName, "/dev"))
+    if f, err = os.OpenFile(filename, os.O_APPEND | os.O_WRONLY, 0200); err != nil {
+        l.Errorf("Error while opening file %v: %v\n", filename, err.Error())
+        return err
+    }
+
+    defer f.Close()
+    dataString = "1"
+    l.Debugf("Attempting to write '%s' to file: %s", dataString, filename)
+    if written, err := f.WriteString(dataString); err != nil {
         return err
     } else if written == 0 {
         l.Warnf("No data written to file %s.", filename)
@@ -204,8 +223,9 @@ func (s *NodeServer) RescanDevice(devName string) (error) {
         return nil
     }
 
-    l.Debugf("Attempting write to file: %s", filename)
-    if written, err := f.WriteString("1"); err != nil {
+    dataString := "1"
+    l.Debugf("Attempting to write '%s' to file: %s", dataString, filename)
+    if written, err := f.WriteString(dataString); err != nil {
         l.Warnf("Could not write to file %s. Error: %+v", filename, err.Error())
         f.Close()
         return nil
@@ -730,7 +750,7 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 
     var errors []error
     // Raw block devices
-    if strings.HasSuffix(targetPath, "/device") {
+    if strings.Contains(targetPath, "volumeDevices") {
         symLink := filepath.Join(targetPath, "device")
         cmd := exec.Command("realpath", symLink)
         l.Debugf("Executing command: %+v", cmd)
@@ -740,6 +760,10 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
             errors = append(errors, err)
         }
         dev := strings.TrimSpace(string(out))
+        err = s.FlushBufs(dev)
+        if err != nil {
+            errors = append(errors, err)
+        }
         err = s.RemoveDevice(dev)
         if err != nil {
             errors = append(errors, err)
@@ -757,40 +781,38 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
                 return nil, err
             }
         }
-        return &csi.NodeUnstageVolumeResponse{}, nil
-    }
-
-    // Mounted devices
-    dev, err := s.DeviceFromTargetPath(targetPath)
-    if err != nil {
-        errors = append(errors, err)
-    }
-
-    mounter := mount.New("")
-    notMountPoint, err := mounter.IsLikelyNotMountPoint(targetPath)
-    if err != nil {
-        errors = append(errors, err)
-        if os.IsNotExist(err) {
-            l.Warnf("mount point '%s' already doesn't exist: '%s'", targetPath, err)
+    } else {
+        // Mounted devices
+        dev, err := s.DeviceFromTargetPath(targetPath)
+        if err != nil {
+            errors = append(errors, err)
         }
-    }
-    if !notMountPoint {
-        if err := mounter.Unmount(targetPath); err != nil {
-            errors = append(errors, status.Errorf(codes.Internal, "Failed to unmount targetPath '%s': %s", targetPath, err))
-        }
-    }
 
-    err = s.RemoveDevice(dev)
-    if err != nil {
-        errors = append(errors, err)
-    }
-    if len(errors) != 0 {
-        for _, error := range errors {
-            l.Errorf(error.Error())
+        mounter := mount.New("")
+        notMountPoint, err := mounter.IsLikelyNotMountPoint(targetPath)
+        if err != nil {
+            errors = append(errors, err)
+            if os.IsNotExist(err) {
+                l.Warnf("mount point '%s' already doesn't exist: '%s'", targetPath, err)
+            }
         }
-    }
-    if err := os.RemoveAll(targetPath); err != nil && !os.IsNotExist(err) {
-        return nil, status.Errorf(codes.Internal, "Cannot remove unmounted target path '%s': %s", targetPath, err)
+        if !notMountPoint {
+            if err := mounter.Unmount(targetPath); err != nil {
+                errors = append(errors, status.Errorf(codes.Internal, "Failed to unmount targetPath '%s': %s", targetPath, err))
+            }
+        }
+        err = s.RemoveDevice(dev)
+        if err != nil {
+            errors = append(errors, err)
+        }
+        if len(errors) != 0 {
+            for _, error := range errors {
+                l.Errorf(error.Error())
+            }
+        }
+        if err := os.RemoveAll(targetPath); err != nil && !os.IsNotExist(err) {
+            return nil, status.Errorf(codes.Internal, "Cannot remove unmounted target path '%s': %s", targetPath, err)
+        }
     }
 
     getLunResp, err := nsProvider.GetLunMapping(volumePath)
@@ -809,6 +831,22 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 
     l.Infof("Unstaged volume %s successfully", volumeID)
     return &csi.NodeUnstageVolumeResponse{}, nil
+}
+
+func (s *NodeServer) FlushBufs(device string) (err error) {
+    l := s.log.WithField("func", "FlushBufs()")
+    l.Infof("device: '%+v'", device)
+    cmd := exec.Command("blockdev", "--flushbufs", device)
+    l.Debugf("Executing command: %+v", cmd)
+    out, err := cmd.CombinedOutput()
+    if err != nil {
+        if strings.Contains(err.Error(), "No such") {
+            l.Errorf("Command output: %+v", string(out))
+        } else {
+            return err
+        }
+    }
+    return nil
 }
 
 // NodePublishVolume - mounts NS fs to the node
