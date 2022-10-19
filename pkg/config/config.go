@@ -37,13 +37,13 @@ type NsData struct {
     DefaultISCSIPort            string `yaml:"defaultiSCSIPort,omitempty"`
     DefaultDataIP               string `yaml:"defaultDataIp,omitempty"`
     ISCSITargetPrefix           string `yaml:"iSCSITargetPrefix,omitempty"`
-    DynamicTargetLunAllocation  string `yaml:"dynamicTargetLunAllocation"`
+    DynamicTargetLunAllocation  *bool   `yaml:"dynamicTargetLunAllocation"`
     NumOfLunsPerTarget          string `yaml:"numOfLunsPerTarget"`
     UseChapAuth                 string `yaml:"useChapAuth"`
     ChapUser                    string `yaml:"chapUser"`
     ChapSecret                  string `yaml:"chapSecret"`
     MountPointPermissions       string `yaml:"mountPointPermissions"`
-    InsecureSkipVerify          *bool `yaml:"insecureSkipVerify,omitempty"`
+    InsecureSkipVerify          *bool  `yaml:"insecureSkipVerify,omitempty"`
 }
 
 // GetFilePath - get filepath of found config file
@@ -94,7 +94,7 @@ func (c *Config) Validate() error {
 
     for name, data := range c.NsMap {
         if data.Address == "" {
-            errors = append(errors, fmt.Sprintf("parameter 'restIp' is missed"))
+            errors = append(errors, fmt.Sprintf("parameter 'restIp' is required but not passed"))
         } else {
             addresses := strings.Split(data.Address, ",")
             for _, address := range addresses {
@@ -110,10 +110,23 @@ func (c *Config) Validate() error {
             }
         }
         if data.Username == "" {
-            errors = append(errors, fmt.Sprintf("parameter 'username' is missed"))
+            errors = append(errors, fmt.Sprintf("parameter 'username' is required but not passed"))
         }
         if data.Password == "" {
-            errors = append(errors, fmt.Sprintf("parameter 'password' is missed"))
+            errors = append(errors, fmt.Sprintf("parameter 'password' is required but not passed"))
+        }
+        if data.DynamicTargetLunAllocation == nil {
+            errors = append(errors, fmt.Sprintf("parameter 'dynamicTargetLunAllocation' is required but not passed"))
+        }
+        if *data.DynamicTargetLunAllocation == false {
+            if data.DefaultTarget == "" {
+                errors = append(errors, fmt.Sprintf(
+                    "parameter 'defaultTarget' is required when dynamicTargetLunAllocation=false but not passed"))
+            }
+            if data.DefaultTargetGroup == "" {
+                errors = append(errors, fmt.Sprintf(
+                    "parameter 'DefaultTargetGroup' is required when dynamicTargetLunAllocation=false but not passed"))
+            }
         }
 
         if data.InsecureSkipVerify == nil {
