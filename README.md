@@ -109,7 +109,7 @@ Releases can be found here - https://github.com/Nexenta/nexentastor-csi-driver-b
    | `defaultTargetGroup`  | NexentaStor target group name                                   | yes if dynamicTargetLunAllocation = false | `CSI-tg1`   |
    | `sparseVolume`         | Defines whether sparse(thin provisioning) should be used. Default `true` | no       | `true`   |
    | `defaultDataIp`       | NexentaStor data IP or HA VIP for mounting shares               | yes for PV | `20.20.20.21`                                                |
-   | `dynamicTargetLunAllocation` | If true driver will automatically manage iSCSI target and targetgroup creation. Config values for target and group will be ignored if dynamicTargetLunAllocation = true (default: true)| no         | `true` |
+   | `dynamicTargetLunAllocation` | If true driver will automatically manage iSCSI target and targetgroup creation. Config values for target and group will be ignored if dynamicTargetLunAllocation = true | yes         | `true` |
    | `numOfLunsPerTarget`  | Maximum number of luns that can be assigned to each target with dynamicTargetLunAllocation | no         | `256`                                                       |
    | `useChapAuth`         | CHAP authentication for iSCSI targets         | no             | `true`     |
    | `chapUser`            | Username for CHAP authentication                        | no             | `admin`    |
