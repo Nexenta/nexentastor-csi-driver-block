@@ -52,7 +52,6 @@ type ISCSIVolumeContext struct {
     ChapSecret                  string
     NumOfLunsPerTarget          int
     UseChapAuth                 bool
-    DynamicTargetLunAllocation  bool
 }
 
 const (
@@ -61,7 +60,6 @@ const (
     DefaultISCSIPort = "3260"
     HostGroupPrefix = "csi"
     PathToInitiatorName = "/host/etc/iscsi/initiatorname.iscsi"
-    DefaultDynamicTargetLunAllocation = true
     DefaultNumOfLunsPerTarget = 256
     DefaultUseChapAuth = false
     DefaultMountPointPermissions = 0750
@@ -445,11 +443,6 @@ func (s *NodeServer) ParseVolumeContext(
         }
     }
 
-    parsedContext.DynamicTargetLunAllocation, err = strconv.ParseBool(volumeContext["dynamicTargetLunAllocation"])
-    if err != nil {
-        l.Infof("Could not parse dynamicTargetLunAllocation, defaulting to %+v. Error: %+v", DefaultDynamicTargetLunAllocation, err)
-        parsedContext.DynamicTargetLunAllocation = DefaultDynamicTargetLunAllocation
-    }
     return parsedContext, nil
 }
 
@@ -559,7 +552,7 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
     }
 
     var iSCSITarget, targetGroup string
-    if parsedContext.DynamicTargetLunAllocation == true {
+    if *cfg.DynamicTargetLunAllocation == true {
         iSCSITarget, targetGroup, err = s.ResolveTargetGroup(parsedContext, nsProvider)
         if err != nil {
             return nil, err

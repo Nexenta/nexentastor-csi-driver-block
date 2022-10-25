@@ -81,7 +81,8 @@ func main() {
 		l.Infof("  - Default dataset: %s", config.DefaultVolumeGroup)
 		l.Infof("  - Default data IP: %s", config.DefaultDataIP)
 		l.Infof("  - Zone: %s", config.Zone)
-		l.Infof(" - InsecureSkipVerify: %+v", *config.InsecureSkipVerify)
+		l.Infof("  - InsecureSkipVerify: %+v", *config.InsecureSkipVerify)
+		l.Infof("  - DynamicTargetLunAllocation: %+v", *config.DynamicTargetLunAllocation)
 	}
 
 	d, err := driver.NewDriver(driver.Args{
