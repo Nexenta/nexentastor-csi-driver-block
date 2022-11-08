@@ -424,11 +424,11 @@ Now that your client is configured, add according values to driver's config or s
     chapSecret: supersecretpassword
 ```
 
-## Checking TLS cecrtificates
+## Checking TLS certificates
 Default driver behavior is to skip certificate checks for all Rest API calls.
 v1.4.4 Release introduces new config parameter `insecureSkipVerify`=<true>.
 When `InsecureSkipVerify` is set to false, the driver will enforce certificate checking.
-To allow adding certificates, nexentastor-csi-driver.yaml has additional volumes added to cnexentastor-block-csi-controller deployment and nexentastor-block-csi-node daemonset.
+To allow adding certificates, nexentastor-csi-driver-block.yaml has additional volumes added to nexentastor-block-csi-controller deployment and nexentastor-block-csi-node daemonset.
 ```bash
             - name: certs-dir
               mountPropagation: HostToContainer
