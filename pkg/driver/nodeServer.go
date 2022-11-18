@@ -586,7 +586,12 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
         if err != nil {
             return nil, err
         }
+        if len(lunMappings) == 0 {
+            return nil, fmt.Errorf(
+                "The lunmapping request returned OK, but lunmapping cannot be found for volume %s", volumeID)
+        }
     }
+    lunNumber := lunMappings[0].Lun
 
     portal := fmt.Sprintf("%s:%s", parsedContext.Address, parsedContext.Port)
     err = s.ISCSILogInRescan(iSCSITarget, portal)
@@ -614,7 +619,6 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
         }
     }
 
-    lunNumber := lunMappings[0].Lun
     devByPath := s.ConstructDevByPath(portal, iSCSITarget, lunNumber)
     found := false
     sleepTime := 500 * time.Millisecond
@@ -712,7 +716,6 @@ func (s *NodeServer) GetMountPointPermissions(volumeContext map[string]string) (
     return os.FileMode(octalPerm), nil
 }
 
-
 // NodeUnstageVolume - unstage volume
 func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (
     *csi.NodeUnstageVolumeResponse,
@@ -731,19 +734,9 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
         return nil, status.Error(codes.InvalidArgument, "Target path must be provided")
     }
 
-    splittedVol := strings.Split(volumeID, ":")
-    if len(splittedVol) != 2 {
-        return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("VolumeId is in wrong format: %s", volumeID))
-    }
-    configName, volumePath := splittedVol[0], splittedVol[1]
-    cfg := s.config.NsMap[configName]
-    nsProvider, err, configName := s.resolveNS(configName, cfg.DefaultVolumeGroup)
-    if err != nil {
-        return nil, err
-    }
-
     var errors []error
     var dev string
+    var err error
     // Raw block devices
     if strings.Contains(targetPath, "volumeDevices") {
         symLink := filepath.Join(targetPath, "device")
@@ -783,19 +776,7 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 
     err = s.RemoveDevice(dev)
     if err != nil {
-        errors = append(errors, err)
-    }
-
-    getLunResp, err := nsProvider.GetLunMapping(volumePath)
-    if err != nil {
-        if !ns.IsNotExistNefError(err) {
-            errors = append(errors, err)
-        } else {
-            l.Infof("Lun mapping %s for volume %s not found, that's OK for deletion", getLunResp.Id, volumePath)
-        }
-    } else {
-        err = nsProvider.DestroyLunMapping(getLunResp.Id)
-        if err != nil{
+        if !strings.Contains(err.Error(), "no such file or directory") {
             errors = append(errors, err)
         }
     }
