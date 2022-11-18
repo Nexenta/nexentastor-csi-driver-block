@@ -1415,21 +1415,21 @@ func (s *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
     }
     nsProvider := resolveResp.nsProvider
 
-    getLunResp, err := nsProvider.GetLunMapping(volumePath)
+    lunMappingParams := ns.GetLunMappingsParams{
+        Volume: volumePath,
+    }
+    luns, err := nsProvider.GetLunMappings(lunMappingParams)
     if err != nil {
         return nil, err
-    } else {
-        err = nsProvider.DestroyLunMapping(getLunResp.Id)
+    }
+    for _, lun := range luns {
+        err = nsProvider.DestroyLunMapping(lun.Id)
         if err != nil{
             return nil, err
         }
     }
 
-    lunMappingParams := ns.GetLunMappingsParams{
-        Volume: volumePath,
-    }
-
-    luns, err := nsProvider.GetLunMappings(lunMappingParams)
+    luns, err = nsProvider.GetLunMappings(lunMappingParams)
     if err != nil {
         return nil, err
     }
@@ -1449,7 +1449,6 @@ func (s *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *c
         }
     }
 
-    l.Infof("Unpublished volumes %s successfully", volumePath)
     return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 

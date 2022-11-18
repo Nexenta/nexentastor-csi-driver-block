@@ -776,7 +776,9 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
 
     err = s.RemoveDevice(dev)
     if err != nil {
-        errors = append(errors, err)
+        if !strings.Contains(err.Error(), "no such file or directory") {
+            errors = append(errors, err)
+        }
     }
 
     if len(errors) != 0 {
