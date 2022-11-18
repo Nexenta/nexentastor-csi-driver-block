@@ -283,7 +283,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: driver
-          image: nexenta/nexentastor-csi-driver-block:master
+          image: nexenta/nexentastor-csi-driver-block:v1.4.10
           imagePullPolicy: IfNotPresent
           args:
             - --nodeid=$(KUBE_NODE_NAME)
@@ -413,7 +413,7 @@ spec:
             capabilities:
               add: ['SYS_ADMIN']
             allowPrivilegeEscalation: true
-          image: nexenta/nexentastor-csi-driver-block:master
+          image: nexenta/nexentastor-csi-driver-block:v1.4.10
           imagePullPolicy: IfNotPresent
           args:
             - --nodeid=$(KUBE_NODE_NAME)
