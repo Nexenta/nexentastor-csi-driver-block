@@ -10,13 +10,13 @@ The NexentaStor Container Storage Interface (CSI) Driver provides a CSI interfac
 
 ## Supported kubernetes versions matrix
 
-|                   | NexentaStor 5.1| NexentaStor 5.2| NexentaStor 5.3|
-|-------------------|----------------|----------------|----------------|
-| Kubernetes >=1.17 | [1.0.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.0.0) | [1.0.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.0.0) |[1.0.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.0.0) |
-| Kubernetes >=1.17 | [1.1.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.1.0) | [1.1.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.1.0) |[1.1.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.1.0) |
-| Kubernetes >=1.17 | [1.2.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.2.0) | [1.2.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.2.0) |[1.2.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.2.0) |
-| Kubernetes >=1.19 | [1.3.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.3.0) | [1.3.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.3.0) |[1.3.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.3.0) |
-| Kubernetes >=1.19 | [master](https://github.com/Nexenta/nexentastor-csi-driver-block) | [master](https://github.com/Nexenta/nexentastor-csi-driver-block)|[master](https://github.com/Nexenta/nexentastor-csi-driver-block)|
+|                   | NexentaStor 5.3+|
+|-------------------|----------------|
+| Kubernetes >=1.17 | [1.0.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.0.0) |
+| Kubernetes >=1.17 | [1.1.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.1.0) |
+| Kubernetes >=1.17 | [1.2.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.2.0) |
+| Kubernetes >=1.19 | [1.3.0](https://github.com/Nexenta/nexentastor-csi-driver-block/tree/1.3.0) |
+| Kubernetes >=1.19 | [master](https://github.com/Nexenta/nexentastor-csi-driver-block) |
 
 Releases can be found here - https://github.com/Nexenta/nexentastor-csi-driver-block/releases
 
