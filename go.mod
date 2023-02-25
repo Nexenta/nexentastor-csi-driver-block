@@ -12,12 +12,10 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/kubernetes-csi/csi-lib-utils v0.7.0
 	github.com/sirupsen/logrus v1.6.0
-	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
-	golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
+	golang.org/x/net v0.7.0
+	golang.org/x/sys v0.5.0
 	google.golang.org/grpc v1.29.1
 	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/apimachinery v0.21.0
-	k8s.io/component-helpers v0.21.0 // indirect
 	k8s.io/kubernetes v1.20.11
 	k8s.io/mount-utils v0.0.0
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
