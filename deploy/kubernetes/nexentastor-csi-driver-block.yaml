@@ -21,8 +21,8 @@ metadata:
 spec:
   attachRequired: true
   podInfoOnMount: true
+  fsGroupPolicy: File
 ---
-
 
 # ---------------------------------
 # NexentaStor CSI Controller Server

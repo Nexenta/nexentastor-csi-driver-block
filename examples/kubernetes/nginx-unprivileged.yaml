@@ -10,7 +10,7 @@ allowVolumeExpansion: true
 #   - key: topology.kubernetes.io/zone
 #     values:
 #     - zone-1
-parameters:
+# parameters:
   mountPointPermissions: "777"
 #   configName: nstor-box3
   #dataset: customPool/customDataset # to overwrite "defaultDataset" config property [pool/dataset]
@@ -48,14 +48,14 @@ spec:
     spec:
       securityContext:
         runAsUser: 1001
-        # fsGroup: 1001
+        fsGroup: 1001
       automountServiceAccountToken: false
       containers:
       - name: nexentastor-block
         image: nginxinc/nginx-unprivileged
         imagePullPolicy: IfNotPresent
         command: [ "/bin/bash", "-c", "--" ]
-        args: [ "while true; do echo $(date) > /var/lib/www/html/timefile; sleep 5; sync; done;" ]
+        args: [ "while true; do echo $(date) >> /var/lib/www/html/timefile; sleep 5; sync; done;" ]
         volumeMounts:
          - mountPath: /var/lib/www/html
            name: pvc
