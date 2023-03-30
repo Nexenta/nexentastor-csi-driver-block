@@ -234,7 +234,7 @@ spec:
         # csi-provisioner: sidecar container that watches Kubernetes PersistentVolumeClaim objects
         # and triggers CreateVolume/DeleteVolume against a CSI endpoint
         - name: csi-provisioner
-          image: k8s.gcr.io/sig-storage/csi-provisioner:v3.0.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v3.0.0
           imagePullPolicy: IfNotPresent
           args:
             - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
@@ -250,7 +250,7 @@ spec:
         # csi-attacher: idecar container that controls volume attachments and calls
         # controllerPublishVolume and controllerUnpublishVolume
         - name: csi-attacher
-          image: k8s.gcr.io/sig-storage/csi-attacher:v3.5.0
+          image: registry.k8s.io/sig-storage/csi-attacher:v3.5.0
           imagePullPolicy: IfNotPresent
           args:
             - --csi-address=$(ADDRESS)
@@ -263,7 +263,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: csi-snapshotter
-          image: k8s.gcr.io/sig-storage/csi-snapshotter:v5.0.1
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v5.0.1
           imagePullPolicy: IfNotPresent
           args:
             - -v=3
@@ -272,7 +272,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy
         - name: csi-resizer
-          image: k8s.gcr.io/sig-storage/csi-resizer:v1.4.0
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.4.0
           args:
             - "--csi-address=$(ADDRESS)"
           env:
@@ -283,7 +283,7 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: driver
-          image: nexenta/nexentastor-csi-driver-block:master
+          image: nexenta/nexentastor-csi-driver-block:v1.4.10
           imagePullPolicy: IfNotPresent
           args:
             - --nodeid=$(KUBE_NODE_NAME)
@@ -391,7 +391,7 @@ spec:
         # 1) registers the CSI driver with kubelet
         # 2) adds the drivers custom NodeId to a label on the Kubernetes Node API Object
         - name: driver-registrar
-          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.5.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.5.0
           imagePullPolicy: IfNotPresent
           args:
             - --v=3
@@ -413,7 +413,7 @@ spec:
             capabilities:
               add: ['SYS_ADMIN']
             allowPrivilegeEscalation: true
-          image: nexenta/nexentastor-csi-driver-block:master
+          image: nexenta/nexentastor-csi-driver-block:v1.4.10
           imagePullPolicy: IfNotPresent
           args:
             - --nodeid=$(KUBE_NODE_NAME)
