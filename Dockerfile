@@ -1,15 +1,16 @@
 # build container
-FROM golang:1.17.4 as builder
+FROM golang:1.20.2-alpine3.17 as builder
 WORKDIR /go/src/github.com/Nexenta/nexentastor-csi-driver-block/
 COPY . ./
 ARG VERSION
 ENV VERSION=$VERSION
+RUN apk add --no-cache make git
 RUN make build &&\
     cp ./bin/nexentastor-csi-driver-block /
 
 
 # driver container
-FROM alpine:3.15.4
+FROM alpine:3.17
 LABEL name="nexentastor-block-csi-driver"
 LABEL maintainer="Nexenta Systems, Inc."
 LABEL description="NexentaStor Block CSI Driver"
@@ -18,6 +19,7 @@ RUN apk update || true &&  \
     apk add coreutils util-linux blkid \
     e2fsprogs bash kmod curl jq ca-certificates
 
+RUN apk update && apk add "libcrypto3>=3.0.8-r3" "libssl3>=3.0.8-r3" && rm -rf /var/cache/apt/*
 RUN mkdir /nexentastor-csi-driver-block
 RUN mkdir -p /etc/ && mkdir -p /config/
 COPY --from=builder /nexentastor-csi-driver-block /nexentastor-csi-driver-block/
