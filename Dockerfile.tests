@@ -1,5 +1,11 @@
+ARG BUILD_IMAGE
+
 # tests container
-FROM golang:1.16
+FROM $BUILD_IMAGE
+
+# install deps
+RUN apk update &&\
+    apk add --no-cache make openssh
 
 WORKDIR /go/src/github.com/Nexenta/nexentastor-csi-driver-block/
 COPY . ./
