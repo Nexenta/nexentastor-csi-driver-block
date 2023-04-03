@@ -16,11 +16,18 @@ require (
 	golang.org/x/sys v0.6.0
 	google.golang.org/grpc v1.29.1
 	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/apimachinery v0.21.0
-	k8s.io/component-helpers v0.21.0 // indirect
 	k8s.io/kubernetes v1.20.11
 	k8s.io/mount-utils v0.0.0
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
+)
+
+require (
+	github.com/go-logr/logr v0.4.0 // indirect
+	github.com/konsorten/go-windows-terminal-sequences v1.0.3 // indirect
+	golang.org/x/text v0.8.0 // indirect
+	google.golang.org/genproto v0.0.0-20201110150050-8816d57aaa9a // indirect
+	google.golang.org/protobuf v1.25.0 // indirect
+	k8s.io/klog/v2 v2.8.0 // indirect
 )
 
 replace (
