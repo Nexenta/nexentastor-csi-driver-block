@@ -1,6 +1,6 @@
 module github.com/Nexenta/nexentastor-csi-driver-block
 
-go 1.13
+go 1.20
 
 require (
 	github.com/Nexenta/go-nexentastor v2.7.1+incompatible
