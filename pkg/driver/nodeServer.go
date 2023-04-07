@@ -19,7 +19,6 @@ import (
     "google.golang.org/grpc/codes"
     "google.golang.org/grpc/status"
     "k8s.io/mount-utils"
-    "k8s.io/kubernetes/pkg/util/resizefs"
     utilexec "k8s.io/utils/exec"
 
     "github.com/cenkalti/backoff"
@@ -1238,10 +1237,7 @@ func (s *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
         if err != nil {
             return nil, err
         }
-        r := resizefs.NewResizeFs(&mount.SafeFormatAndMount{
-            Interface: mount.New(""),
-            Exec:      utilexec.New(),
-        })
+        r := mount.NewResizeFs(utilexec.New())
         if _, err = r.Resize(devName, volumePath); err != nil {
             return nil, status.Errorf(
                 codes.Internal, "Could not resize volume %q (%q):  %v", volumeID, devName, err)
