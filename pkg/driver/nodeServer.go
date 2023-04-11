@@ -19,7 +19,6 @@ import (
     "google.golang.org/grpc/codes"
     "google.golang.org/grpc/status"
     "k8s.io/mount-utils"
-    "k8s.io/kubernetes/pkg/util/resizefs"
     utilexec "k8s.io/utils/exec"
 
     "github.com/cenkalti/backoff"
@@ -1204,17 +1203,26 @@ func (s *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
         return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
     }
 
-    targetPath := req.GetStagingTargetPath()
-    if len(targetPath) == 0 {
-        return nil, status.Error(codes.InvalidArgument, "Staging targetPath not provided")
+    splittedVol := strings.Split(volumeID, ":")
+    if len(splittedVol) != 2 {
+        return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("VolumeId is in wrong format: %s", volumeID))
+    }
+    configName, volumePath := splittedVol[0], splittedVol[1]
+    cfg := s.config.NsMap[configName]
+    nsProvider, err, configName := s.resolveNS(configName, cfg.DefaultVolumeGroup)
+    if err != nil {
+        return nil, err
+    }
+
+    // Check if volume was not already expanded
+    l.Debugf("Checking volume %s size", volumePath)
+    _, err = nsProvider.GetVolume(volumePath)
+    if err != nil {
+        return nil, status.Errorf(codes.NotFound, "Did not find volume %s: %s", volumePath, err)
     }
 
     volumeCapability := req.GetVolumeCapability()
-    if volumeCapability == nil {
-        return nil, status.Error(codes.InvalidArgument, "Volume capability not provided")
-    }
-
-    volumePath := req.GetVolumePath()
+    volumePath = req.GetVolumePath()
     if len(volumePath) == 0 {
         return nil, status.Error(codes.InvalidArgument, "Staging volumePath not provided")
     }
@@ -1229,10 +1237,7 @@ func (s *NodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVo
         if err != nil {
             return nil, err
         }
-        r := resizefs.NewResizeFs(&mount.SafeFormatAndMount{
-            Interface: mount.New(""),
-            Exec:      utilexec.New(),
-        })
+        r := mount.NewResizeFs(utilexec.New())
         if _, err = r.Resize(devName, volumePath); err != nil {
             return nil, status.Errorf(
                 codes.Internal, "Could not resize volume %q (%q):  %v", volumeID, devName, err)

@@ -8,7 +8,8 @@ import (
     "time"
 
     "github.com/container-storage-interface/spec/lib/go/csi"
-    "github.com/golang/protobuf/ptypes"
+    // "google.golang.org/protobuf/ptypes"
+    "google.golang.org/protobuf/types/known/timestamppb"
     "github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
     "github.com/sirupsen/logrus"
     "golang.org/x/net/context"
@@ -384,6 +385,12 @@ func (s *ControllerServer) pickAvailabilityZone(requirement *csi.TopologyRequire
         }
     }
     return ""
+}
+
+func (s *ControllerServer) ControllerGetVolume(
+    ctx context.Context, req *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error,
+) {
+    return nil, status.Errorf(codes.Unimplemented, "method CreateVolume not implemented")
 }
 
 func (s *ControllerServer) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (
@@ -935,7 +942,7 @@ func (s *ControllerServer) CreateSnapshot(ctx context.Context, req *csi.CreateSn
         return nil, err
     }
 
-    creationTime, err := ptypes.TimestampProto(createdSnapshot.CreationTime)
+    creationTime := timestamppb.New(createdSnapshot.CreationTime)
     if err != nil {
         return nil, err
     }
@@ -1241,7 +1248,7 @@ func (s *ControllerServer) getVolumeSnapshotList(volumeId string, req *csi.ListS
 }
 
 func convertNSSnapshotToCSISnapshot(snapshot ns.Snapshot, configName string) *csi.ListSnapshotsResponse_Entry {
-    creationTime, _ := ptypes.TimestampProto(snapshot.CreationTime)
+    creationTime := timestamppb.New(snapshot.CreationTime)
 
     return &csi.ListSnapshotsResponse_Entry{
         Snapshot: &csi.Snapshot{

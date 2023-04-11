@@ -1,26 +1,33 @@
 module github.com/Nexenta/nexentastor-csi-driver-block
 
-go 1.13
+go 1.20
 
 require (
 	github.com/Nexenta/go-nexentastor v2.7.1+incompatible
 	github.com/antonfisher/nested-logrus-formatter v1.1.0
 	github.com/cenkalti/backoff v2.2.1+incompatible
-	github.com/container-storage-interface/spec v1.2.0
+	github.com/container-storage-interface/spec v1.7.0
 	github.com/educlos/testrail v0.0.0-20200402224751-3ab3c62b1fdc
-	github.com/golang/protobuf v1.4.3
 	github.com/google/uuid v1.1.2
 	github.com/kubernetes-csi/csi-lib-utils v0.7.0
-	github.com/sirupsen/logrus v1.6.0
-	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
-	golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
-	google.golang.org/grpc v1.29.1
-	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/apimachinery v0.21.0
-	k8s.io/component-helpers v0.21.0 // indirect
-	k8s.io/kubernetes v1.20.11
+	github.com/sirupsen/logrus v1.8.1
+	golang.org/x/net v0.8.0
+	golang.org/x/sys v0.6.0
+	google.golang.org/grpc v1.49.0
+	google.golang.org/protobuf v1.28.1
+	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/mount-utils v0.0.0
-	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
+	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d
+)
+
+require (
+	github.com/go-logr/logr v1.2.3 // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/stretchr/testify v1.8.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
+	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 // indirect
+	k8s.io/klog/v2 v2.80.1 // indirect
 )
 
 replace (
