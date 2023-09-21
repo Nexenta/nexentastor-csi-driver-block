@@ -37,6 +37,7 @@ type NsData struct {
     DefaultISCSIPort            string `yaml:"defaultiSCSIPort,omitempty"`
     DefaultDataIP               string `yaml:"defaultDataIp,omitempty"`
     ISCSITargetPrefix           string `yaml:"iSCSITargetPrefix,omitempty"`
+    ISCSITimeout                string `yaml:"iSCSITimeout,omitempty"`
     DynamicTargetLunAllocation  *bool   `yaml:"dynamicTargetLunAllocation"`
     NumOfLunsPerTarget          string `yaml:"numOfLunsPerTarget"`
     UseChapAuth                 string `yaml:"useChapAuth"`

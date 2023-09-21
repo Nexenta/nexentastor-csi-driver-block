@@ -51,6 +51,7 @@ type ISCSIVolumeContext struct {
     ChapSecret                  string
     NumOfLunsPerTarget          int
     UseChapAuth                 bool
+    ISCSITimeout                int
 }
 
 const (
@@ -63,6 +64,7 @@ const (
     DefaultUseChapAuth = false
     DefaultMountPointPermissions = 0750
     DefaultFindMntTimeout = 90
+    DefaultISCSITimeout = 300
 )
 
 
@@ -384,6 +386,14 @@ func (s *NodeServer) ParseVolumeContext(
 ) {
     l := s.log.WithField("func", "ParseVolumeContext()")
     cfg := s.config.NsMap[configName]
+    parsedContext.ISCSITimeout = DefaultISCSITimeout
+    if cfg.ISCSITimeout != "" {
+        parsedContext.ISCSITimeout, err = strconv.Atoi(cfg.ISCSITimeout)
+        if err != nil {
+            l.Infof("Could not parse ISCSITimeout, setting default: %+v", DefaultISCSITimeout)
+            parsedContext.ISCSITimeout = DefaultISCSITimeout
+        }
+    }
     parsedContext.TargetGroup = volumeContext["TargetGroup"]
     parsedContext.ISCSITarget = volumeContext["Target"]
     parsedContext.ISCSITargetPrefix = cfg.ISCSITargetPrefix
@@ -620,14 +630,20 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
     devByPath := s.ConstructDevByPath(portal, iSCSITarget, lunNumber)
     found := false
-    sleepTime := 500 * time.Millisecond
-    timeout := 60 * time.Second
+    sleepTime := 1 * time.Second
+    timeout := parsedContext.ISCSITimeout
+
     for !found {
-        if sleepTime > timeout {
-            return nil, status.Error(codes.DeadlineExceeded, "Mount is nil in volume capability")
+        if sleepTime > time.Duration(timeout) * time.Second {
+            return nil, status.Errorf(
+                codes.DeadlineExceeded, "Could not find iSCSI device in %v seconds", timeout)
+        }
+        err = s.ISCSILogInRescan(iSCSITarget, portal)
+        if err != nil {
+            return nil, err
         }
         if _, err := os.Stat(filepath.Join("/host", devByPath)); os.IsNotExist(err) {
-            l.Infof("Device %s not found, sleep %s", devByPath, sleepTime)
+            l.Infof("Device %s not found, sleep %v", devByPath, sleepTime)
             time.Sleep(sleepTime)
             sleepTime *= 2
         } else {
