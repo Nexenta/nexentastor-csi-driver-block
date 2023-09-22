@@ -118,7 +118,7 @@ ifeq (${VERSION}, master)
 		--k8sDeploymentFile="/tmp/nexentastor-csi-driver-block-local.yaml" \
 		--k8sSecretFile="./_configs/driver-config-single-default.yaml"
 else
-	sed -e "s/image: nexenta\/nexentastor-csi-driver-block:master/image: ${REGISTRY_LOCAL}\/nexentastor-csi-driver-block:v${VERSION}/g" \
+	sed -E "s/image: nexenta\/nexentastor-csi-driver-block:v.+/image: ${REGISTRY_LOCAL}\/nexentastor-csi-driver-block:v${VERSION}/g" \
 		./deploy/kubernetes/nexentastor-csi-driver-block.yaml > /tmp/nexentastor-csi-driver-block-local.yaml
 	go test -timeout 20m tests/e2e/driver_test.go -v -count 1 \
 		--k8sConnectionString="root@${TEST_K8S_IP}" \
