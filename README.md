@@ -117,6 +117,7 @@ Releases can be found here - https://github.com/Nexenta/nexentastor-csi-driver-b
    | `debug`               | print more logs (default: false)                                | no         | `true`                                                       |
    | `zone`                | Zone to match topology.kubernetes.io/zone.                      | no         | `us-west`                                                       |
    |`insecureSkipVerify`| TLS certificates check will be skipped when `true` (default: 'true')| no | `false` |
+   |`iSCSITimeout`| Maximum time for iSCSI device discovery (default: '300')| no | `200` |
 
    **Note**: if parameter `defaultVolumeGroup`/`defaultDataIp` is not specified in driver configuration,
    then parameter `volumeGroup`/`dataIp` must be specified in _StorageClass_ configuration.
