@@ -1130,7 +1130,11 @@ func (s *NodeServer) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCa
     *csi.NodeGetCapabilitiesResponse,
     error,
 ) {
-    s.log.WithField("func", "NodeGetCapabilities()").Infof("request: '%+v'", req)
+    if len(req.String()) != 0 {
+        s.log.WithField("func", "NodeGetCapabilities()").Infof("request: '%+v'", req)
+    } else {
+        s.log.WithField("func", "NodeGetCapabilities()").Debugf("request: '%+v'", req)
+    }
 
     return &csi.NodeGetCapabilitiesResponse{
         Capabilities: []*csi.NodeServiceCapability{
