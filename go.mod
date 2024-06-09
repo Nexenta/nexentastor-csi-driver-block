@@ -4,17 +4,17 @@ go 1.20
 
 require (
 	github.com/Nexenta/go-nexentastor v2.7.1+incompatible
-	github.com/antonfisher/nested-logrus-formatter v1.1.0
+	github.com/antonfisher/nested-logrus-formatter v1.3.0
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/container-storage-interface/spec v1.7.0
 	github.com/educlos/testrail v0.0.0-20200402224751-3ab3c62b1fdc
-	github.com/google/uuid v1.1.2
+	github.com/google/uuid v1.3.0
 	github.com/kubernetes-csi/csi-lib-utils v0.7.0
 	github.com/sirupsen/logrus v1.8.1
-	golang.org/x/net v0.8.0
-	golang.org/x/sys v0.6.0
-	google.golang.org/grpc v1.49.0
-	google.golang.org/protobuf v1.28.1
+	golang.org/x/net v0.23.0
+	golang.org/x/sys v0.18.0
+	google.golang.org/grpc v1.58.3
+	google.golang.org/protobuf v1.34.1
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/mount-utils v0.0.0
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d
@@ -22,11 +22,10 @@ require (
 
 require (
 	github.com/go-logr/logr v1.2.3 // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/stretchr/testify v1.8.0 // indirect
-	golang.org/x/text v0.8.0 // indirect
-	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 // indirect
+	golang.org/x/text v0.15.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
 	k8s.io/klog/v2 v2.80.1 // indirect
 )
 
