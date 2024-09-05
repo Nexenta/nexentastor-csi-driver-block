@@ -283,8 +283,9 @@ spec:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy/
         - name: driver
-          image: nexenta/nexentastor-csi-driver-block:v1.4.10
-          imagePullPolicy: IfNotPresent
+          image: nexenta/nexentastor-csi-driver-block:vtest
+          terminationMessagePath: /tmp/termination-log
+          imagePullPolicy: Always
           args:
             - --nodeid=$(KUBE_NODE_NAME)
             - --endpoint=unix://csi/csi.sock
@@ -394,9 +395,9 @@ spec:
           image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.5.0
           imagePullPolicy: IfNotPresent
           args:
-            - --v=3
+            - --v=5
             - --csi-address=/csi/csi.sock
-            - --kubelet-registration-path=/var/lib/kubelet/plugins_registry/nexentastor-block-csi-driver.nexenta.com/csi.sock
+            - --kubelet-registration-path=/var/lib/kubelet/plugins/nexentastor-block-csi-driver.nexenta.com/csi.sock
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -413,8 +414,9 @@ spec:
             capabilities:
               add: ['SYS_ADMIN']
             allowPrivilegeEscalation: true
-          image: nexenta/nexentastor-csi-driver-block:v1.4.10
-          imagePullPolicy: IfNotPresent
+          image: nexenta/nexentastor-csi-driver-block:vtest
+          imagePullPolicy: Always
+          terminationMessagePath: /tmp/termination-log
           args:
             - --nodeid=$(KUBE_NODE_NAME)
             - --endpoint=unix://csi/csi.sock
@@ -425,13 +427,12 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
           volumeMounts:
+            - name: dev
+              mountPath: /dev
             - name: socket-dir
               mountPath: /csi
             - name: secret
               mountPath: /config
-            - name: host
-              mountPath: /host
-              mountPropagation: Bidirectional
             - name: pods-mount-dir
               mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
@@ -442,9 +443,13 @@ spec:
               mountPropagation: HostToContainer
               mountPath: /usr/local/share/ca-certificates
       volumes:
+        - name: dev
+          hostPath:
+            path: /dev
+            type: Directory
         - name: socket-dir
           hostPath:
-            path: /var/lib/kubelet/plugins_registry/nexentastor-block-csi-driver.nexenta.com
+            path: /var/lib/kubelet/plugins/nexentastor-block-csi-driver.nexenta.com
             type: DirectoryOrCreate
         - name: registration-dir
           hostPath:
@@ -453,10 +458,6 @@ spec:
         - name: pods-mount-dir
           hostPath:
             path: /var/lib/kubelet/pods
-            type: Directory
-        - name: host
-          hostPath:
-            path: /
             type: Directory
         - name: plugin-dir
           hostPath:

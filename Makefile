@@ -4,13 +4,22 @@
 # NOCOLOR=1                # disable colors
 # - TEST_K8S_IP=10.3.199.250 # e2e k8s tests
 #
+VERSION ?= $(if $(subst HEAD,,${GIT_BRANCH}),$(GIT_BRANCH),$(GIT_TAG))
 
 DRIVER_NAME = nexentastor-csi-driver-block
 IMAGE_NAME ?= ${DRIVER_NAME}
 
-BASE_IMAGE ?= alpine:3.20
+ALPINE_VERSION ?= 3.20
+BASE_IMAGE ?= alpine:$(ALPINE_VERSION)
 BUILD_IMAGE ?= golang:1.22.3-alpine3.20
 CSI_SANITY_VERSION_TAG ?= v4.0.0
+
+UPPER_VERSION ?= $(shell echo $(VERSION) | tr '[:lower:]' '[:upper:]')
+DRIVER_COMMIT ?= $(shell git rev-parse HEAD | cut -c 1-7)
+UPPER_COMMIT ?= $(shell echo $(DRIVER_COMMIT) | tr '[:lower:]' '[:upper:]')
+OPEN_ISCSI_IQN ?= iqn.2024-09.com.nexenta.${DRIVER_NAME}
+OPEN_ISCSI_VERSION ?= 123
+OPEN_ISCSI_NAMESPACE ?= ISCSIADM_NAMESPACE_${UPPER_VERSION}_${UPPER_COMMIT}
 
 DOCKER_FILE = Dockerfile
 DOCKER_FILE_TESTS = Dockerfile.tests
@@ -25,7 +34,6 @@ REGISTRY_LOCAL ?= 10.3.199.92:5000
 GIT_BRANCH = $(shell git rev-parse --abbrev-ref HEAD | sed -e "s/.*\\///")
 GIT_TAG = $(shell git describe --tags)
 # use git branch as default version if not set by env variable, if HEAD is detached that use the most recent tag
-VERSION ?= $(if $(subst HEAD,,${GIT_BRANCH}),$(GIT_BRANCH),$(GIT_TAG))
 COMMIT ?= $(shell git rev-parse HEAD | cut -c 1-7)
 DATETIME ?= $(shell date +'%F_%T')
 LDFLAGS ?= \
@@ -34,7 +42,11 @@ LDFLAGS ?= \
 	-X github.com/Nexenta/nexentastor-csi-driver-block/pkg/driver.DateTime=${DATETIME}
 
 DOCKER_ARGS = --build-arg BUILD_IMAGE=${BUILD_IMAGE} \
-              --build-arg BASE_IMAGE=${BASE_IMAGE}
+              --build-arg BASE_IMAGE=${BASE_IMAGE} \
+              --build-arg ALPINE_VERSION=${ALPINE_VERSION} \
+              --build-arg OPEN_ISCSI_IQN=${OPEN_ISCSI_IQN} \
+              --build-arg OPEN_ISCSI_VERSION=${OPEN_ISCSI_VERSION} \
+              --build-arg OPEN_ISCSI_NAMESPACE=${OPEN_ISCSI_NAMESPACE}
 
 .PHONY: all
 all:
@@ -65,6 +77,7 @@ build:
 
 .PHONY: container-build
 container-build:
+	cp /etc/iscsi/initiatorname.iscsi initiatorname.iscsi
 ifeq (${VERSION}, master)
 	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:${VERSION} --build-arg VERSION=${VERSION} ${DOCKER_ARGS} .
 else
@@ -72,25 +85,21 @@ else
 endif
 
 .PHONY: container-push-local
-container-push-local:
+container-push-local: container-build
 ifeq (${VERSION}, master)
-	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:${VERSION} --build-arg VERSION=${VERSION} ${DOCKER_ARGS} .
 	docker tag  ${IMAGE_NAME}:${VERSION} ${REGISTRY_LOCAL}/${IMAGE_NAME}:${VERSION}
 	docker push ${REGISTRY_LOCAL}/${IMAGE_NAME}:${VERSION}
 else
-	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:v${VERSION} --build-arg VERSION=v${VERSION} ${DOCKER_ARGS} .
 	docker tag  ${IMAGE_NAME}:v${VERSION} ${REGISTRY_LOCAL}/${IMAGE_NAME}:v${VERSION}
 	docker push ${REGISTRY_LOCAL}/${IMAGE_NAME}:v${VERSION}
 endif
 
 .PHONY: container-push-remote
-container-push-remote:
+container-push-remote: container-build
 ifeq (${VERSION}, master)
-	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:${VERSION} --build-arg VERSION=${VERSION} ${DOCKER_ARGS} .
 	docker tag  ${IMAGE_NAME}:${VERSION} ${REGISTRY}/${IMAGE_NAME}:${VERSION}
 	docker push ${REGISTRY}/${IMAGE_NAME}:${VERSION}
 else
-	docker build -f ${DOCKER_FILE} -t ${IMAGE_NAME}:v${VERSION} --build-arg VERSION=v${VERSION} ${DOCKER_ARGS} .
 	docker tag  ${IMAGE_NAME}:v${VERSION} ${REGISTRY}/${IMAGE_NAME}:v${VERSION}
 	docker push ${REGISTRY}/${IMAGE_NAME}:v${VERSION}
 endif
@@ -128,6 +137,7 @@ endif
 
 .PHONY: test-e2e-k8s-local-image-container
 test-e2e-k8s-local-image-container: check-env-TEST_K8S_IP
+	cp /etc/iscsi/initiatorname.iscsi initiatorname.iscsi
 	docker build -f ${DOCKER_FILE_TESTS} -t ${IMAGE_NAME}-test --build-arg VERSION=${VERSION} ${DOCKER_ARGS} \
 	--build-arg TESTRAIL_URL=${TESTRAIL_URL} \
 	--build-arg TESTRAIL_USR=${TESTRAIL_USR} \
@@ -147,6 +157,7 @@ test-e2e-k8s-remote-image: check-env-TEST_K8S_IP
 		--k8sSecretFile="./_configs/driver-config-single-default.yaml"
 .PHONY: test-e2e-k8s-local-image-container
 test-e2e-k8s-remote-image-container: check-env-TEST_K8S_IP
+	cp /etc/iscsi/initiatorname.iscsi initiatorname.iscsi
 	docker build -f ${DOCKER_FILE_TESTS} -t ${IMAGE_NAME}-test --build-arg VERSION=${VERSION} ${DOCKER_ARGS} \
 	--build-arg TESTRAIL_URL=${TESTRAIL_URL} \
 	--build-arg TESTRAIL_USR=${TESTRAIL_USR} \
@@ -164,12 +175,13 @@ test-e2e-k8s-remote-image-container: check-env-TEST_K8S_IP
 # - nfs client requires running container as privileged one
 .PHONY: test-csi-sanity-container
 test-csi-sanity-container:
+	cp /etc/iscsi/initiatorname.iscsi initiatorname.iscsi
 	rm -rf /tmp/csi-mount /tmp/csi-staging
 	docker build ${DOCKER_ARGS} \
 		--build-arg CSI_SANITY_VERSION_TAG=${CSI_SANITY_VERSION_TAG} \
 		-f ${DOCKER_FILE_TEST_CSI_SANITY} \
 		-t ${IMAGE_NAME}-test-csi-sanity .
-	docker run --network host --privileged=true --mount type=bind,source=/,target=/host,bind-propagation=rshared --mount type=bind,source=/tmp,target=/tmp,bind-propagation=rshared -i -e NOCOLORS=${NOCOLORS} ${IMAGE_NAME}-test-csi-sanity
+	docker run --network host --privileged=true --mount type=bind,source=/tmp,target=/tmp,bind-propagation=rshared -i -e NOCOLORS=${NOCOLORS} ${IMAGE_NAME}-test-csi-sanity
 	docker image prune -f
 	docker images | grep nexentastor-csi-driver-block-test-csi-sanity | awk '{print $$1}' | xargs docker rmi -f
 

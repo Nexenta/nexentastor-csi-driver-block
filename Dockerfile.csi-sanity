@@ -1,6 +1,24 @@
 ARG BASE_IMAGE
 ARG BUILD_IMAGE
 
+# iscsi build container
+FROM $BASE_IMAGE as builder-iscsi
+ARG OPEN_ISCSI_VERSION
+ARG OPEN_ISCSI_NAMESPACE
+ARG ALPINE_VERSION
+
+RUN apk add --update python3-dev py3-pip build-base cairo cairo-dev cargo freetype-dev \
+  gcc gdk-pixbuf-dev gettext jpeg-dev lcms2-dev libffi-dev musl-dev openjpeg-dev openssl-dev \
+  pango-dev poppler-utils postgresql-client postgresql-dev py-cffi python3-dev rust tcl-dev \
+  tiff-dev tk-dev zlib-dev alpine-sdk sudo git openrc open-iscsi autoconf py3-cryptography
+RUN abuild-keygen -n -a -i -q && \
+    git clone -b $ALPINE_VERSION-stable https://git.alpinelinux.org/aports
+WORKDIR /aports/main/open-iscsi
+RUN sed -i -e "s:^pkgrel=[0-9]*$:pkgrel=$OPEN_ISCSI_VERSION:" \
+    -e "/build()/a sed -i s:ISCSIADM_ABSTRACT_NAMESPACE:$OPEN_ISCSI_NAMESPACE: usr/mgmt_ipc.h" \
+    -e "s/openssl-dev>3/openssl-dev/" APKBUILD
+RUN abuild -F -r -q
+
 # csi-sanity build container
 FROM $BUILD_IMAGE as builder-csi-sanity
 WORKDIR /go/src/github.com/kubernetes-csi/
@@ -31,9 +49,13 @@ WORKDIR /
 # driver UNIX socket
 ENV SOCK="unix:///csi.sock"
 # install dependencies
+# copy iscsi files
+COPY --from=builder-iscsi /root/.abuild/*.pub /etc/apk/keys
+COPY --from=builder-iscsi /root/packages /root/packages
+RUN echo /root/packages/main >>/etc/apk/repositories
 RUN apk update || true &&  \
     apk add coreutils util-linux blkid \
-    e2fsprogs bash kmod curl jq ca-certificates
+    e2fsprogs bash kmod curl jq ca-certificates open-iscsi
 
 # copy csi-sanity from build container
 COPY --from=builder-csi-sanity /csi-sanity /
@@ -42,23 +64,11 @@ RUN mkdir /nexentastor-csi-driver-block
 COPY --from=builder-driver /nexentastor-csi-driver-block /nexentastor-csi-driver-block/
 RUN mkdir /lib64 &&\
     ln -s /lib/libc.musl-x86_64.so.1 /lib64/ld-linux-x86-64.so.2
-ADD chroot-host-wrapper.sh /nexentastor-csi-driver-block
-RUN chmod 777 /nexentastor-csi-driver-block/chroot-host-wrapper.sh
-RUN    ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/blkid \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/ln \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/iscsiadm \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/resize2fs \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/blockdev \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/e2fsck \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/findmnt \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/lsscsi \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.ext3 \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.ext4 \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mkfs.xfs \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipath \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/rm \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/multipathd \
-    && ln -s /nexentastor-csi-driver-block/chroot-host-wrapper.sh /nexentastor-csi-driver-block/mount
+
+RUN mkdir -p /etc/iscsi
+COPY initiatorname.iscsi /etc/iscsi/initiatorname.iscsi
+RUN cp -r /usr/sbin/* /sbin/
+RUN /sbin/iscsid
 
 ENV PATH="/nexentastor-csi-driver-block/:${PATH}"
 # copy driver config file

@@ -59,7 +59,7 @@ const (
     DefaultFsType = "ext4"
     DefaultISCSIPort = "3260"
     HostGroupPrefix = "csi"
-    PathToInitiatorName = "/host/etc/iscsi/initiatorname.iscsi"
+    PathToInitiatorName = "/etc/iscsi/initiatorname.iscsi"
     DefaultNumOfLunsPerTarget = 256
     DefaultUseChapAuth = false
     DefaultMountPointPermissions = 0750
@@ -130,7 +130,7 @@ func (s* NodeServer) ISCSILogInRescan(target, portal string) (error) {
     l.Debugf("Executing command: %+v", cmd)
     out, err := cmd.CombinedOutput()
     if err != nil {
-        l.Errorf("iscsiadm discovery error: %+v", err)
+        l.Errorf("iscsiadm discovery error: %+v", string(out))
         return err
     }
     cmd = exec.Command("iscsiadm", "-m", "node", "-T", target, "-p", portal, "-l")
@@ -155,13 +155,10 @@ func (s* NodeServer) ISCSILogInRescan(target, portal string) (error) {
 func (s *NodeServer) GetRealDeviceName(symLink string) (string, error) {
     l := s.log.WithField("func", "GetRealDeviceName()")
     l.Debugf("Evaluating symLink: %s", symLink)
-    devName, err := filepath.EvalSymlinks(fmt.Sprintf("/host/%s", symLink))
+    devName, err := filepath.EvalSymlinks(symLink)
     if err != nil {
         l.Errorf("Could not evaluate symlink: %s, err: %+v", symLink, err)
         return "", err
-    }
-    if strings.HasPrefix(devName, "/host") {
-        devName = strings.TrimPrefix(devName, "/host")
     }
     l.Debugf("Device name is: %s", devName)
     return devName, err
@@ -175,7 +172,7 @@ func (s *NodeServer) RemoveDevice(devName string) (error) {
         err error
     )
 
-    filename := fmt.Sprintf("/host/sys/block%s/device/state", strings.TrimPrefix(devName, "/dev"))
+    filename := fmt.Sprintf("/sys/block%s/device/state", strings.TrimPrefix(devName, "/dev"))
     if f, err = os.OpenFile(filename, os.O_APPEND | os.O_WRONLY, 0200); err != nil {
         l.Errorf("Error while opening file %v: %v\n", filename, err.Error())
         return err
@@ -191,7 +188,7 @@ func (s *NodeServer) RemoveDevice(devName string) (error) {
         return nil
     }
 
-    filename = fmt.Sprintf("/host/sys/block%s/device/delete", strings.TrimPrefix(devName, "/dev"))
+    filename = fmt.Sprintf("/sys/block%s/device/delete", strings.TrimPrefix(devName, "/dev"))
     if f, err = os.OpenFile(filename, os.O_APPEND | os.O_WRONLY, 0200); err != nil {
         l.Errorf("Error while opening file %v: %v\n", filename, err.Error())
         return err
@@ -415,7 +412,7 @@ func (s *NodeServer) ParseVolumeContext(
         if cfg.DefaultHostGroup != "" {
             parsedContext.HostGroup = cfg.DefaultHostGroup
         } else {
-            parsedContext.HostGroup, err = s.CreateUpdateHostGroup(nsProvider)
+            parsedContext.HostGroup, err = s.GetOrCreateHostGroup(nsProvider)
             if err != nil {
                 return parsedContext, err
             }
@@ -642,7 +639,7 @@ func (s *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolu
         if err != nil {
             return nil, err
         }
-        if _, err := os.Stat(filepath.Join("/host", devByPath)); os.IsNotExist(err) {
+        if _, err := os.Stat(devByPath); os.IsNotExist(err) {
             l.Infof("Device %s not found, sleep %v", devByPath, sleepTime)
             time.Sleep(sleepTime)
             sleepTime *= 2
@@ -910,8 +907,8 @@ func (s *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublish
     return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (s *NodeServer) CreateUpdateHostGroup(nsProvider ns.ProviderInterface) (name string, err error) {
-    l := s.log.WithField("func", "CreateUpdateHostGroup()")
+func (s *NodeServer) GetOrCreateHostGroup(nsProvider ns.ProviderInterface) (name string, err error) {
+    l := s.log.WithField("func", "GetOrCreateHostGroup()")
     nodeIQN, err := s.GetNodeIQN()
     if err != nil {
         return name, err
@@ -1278,6 +1275,9 @@ func (s *NodeServer) DeviceFromTargetPath(volumePath string) (deviceName string,
     ctx, cancel := context.WithTimeout(context.Background(), DefaultFindMntTimeout * time.Second)
     defer cancel()
 
+    if volumePath == "/" {
+        return "", status.Errorf(codes.InvalidArgument, "VolumePath is reported as %s", volumePath)
+    }
     cmd := exec.CommandContext(ctx, "findmnt", "-o", "source", "--noheadings", "--target", volumePath)
     l.Debugf("Executing command: %+v", cmd)
     out, err := cmd.CombinedOutput()
