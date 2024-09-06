@@ -1287,6 +1287,19 @@ func (s *NodeServer) DeviceFromTargetPath(volumePath string) (deviceName string,
         l.Debugf("Command output: %+v", string(out))
     }
     devicePath := strings.TrimSpace(string(out))
+
+    cmd = exec.CommandContext(ctx, "findmnt", "-o", "source", "--noheadings", "--target", "/")
+    out, err = cmd.CombinedOutput()
+    if err != nil {
+        return "", status.Errorf(codes.Internal, "Could not determine device path: %v", err)
+    } else {
+        l.Debugf("Command output: %+v", string(out))
+    }
+    rootDevice := strings.TrimSpace(string(out))
+    if devicePath == rootDevice {
+        return "", status.Errorf(
+            codes.InvalidArgument, "volumePath %s returned %s device which is a root device", volumePath, devicePath)
+    }
     return devicePath, nil
 }
 
