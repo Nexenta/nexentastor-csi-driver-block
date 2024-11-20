@@ -9,7 +9,7 @@ DRIVER_NAME = nexentastor-csi-driver-block
 IMAGE_NAME ?= ${DRIVER_NAME}
 
 BASE_IMAGE ?= alpine:3.20
-BUILD_IMAGE ?= golang:1.22.3-alpine3.20
+BUILD_IMAGE ?= golang:1.23.1-alpine3.20
 CSI_SANITY_VERSION_TAG ?= v4.0.0
 
 DOCKER_FILE = Dockerfile

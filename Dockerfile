@@ -1,8 +1,8 @@
-ARG BASE_IMAGE
-ARG BUILD_IMAGE
+ARG BASE_IMAGE=alpine:3.20
+ARG BUILD_IMAGE=golang:1.23.1-alpine3.20
 
 # build container
-FROM $BUILD_IMAGE as builder
+FROM $BUILD_IMAGE AS builder
 WORKDIR /go/src/github.com/Nexenta/nexentastor-csi-driver-block/
 COPY . ./
 ARG VERSION
@@ -22,7 +22,7 @@ RUN apk update || true &&  \
     apk add coreutils util-linux blkid \
     e2fsprogs bash kmod curl jq ca-certificates
 
-RUN apk update && apk add "libcrypto3>=3.0.8-r3" "libssl3>=3.0.8-r3" && rm -rf /var/cache/apt/*
+RUN apk update && apk add "libcrypto3>=3.3.2-r1" "libssl3>=3.3.2-r1" && rm -rf /var/cache/apt/*
 RUN mkdir /nexentastor-csi-driver-block
 RUN mkdir -p /etc/ && mkdir -p /config/
 COPY --from=builder /nexentastor-csi-driver-block /nexentastor-csi-driver-block/
