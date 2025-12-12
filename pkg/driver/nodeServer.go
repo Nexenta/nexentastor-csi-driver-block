@@ -801,12 +801,11 @@ func (s *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstage
             l.Errorf(error.Error())
         }
     }
-    if err := os.RemoveAll(targetPath); err != nil {
+    if err := os.Remove(targetPath); err != nil {
         if os.IsNotExist(err) {
             l.Infof("mount point '%s' already doesn't exist: '%s', return OK", targetPath, err)
-            return &csi.NodeUnstageVolumeResponse{}, nil
         } else {
-            return nil, err
+            l.Warnf("Failed to remove publish path %s, err %+v", targetPath, err)
         }
     }
     l.Infof("Unstaged volume %s successfully", volumeID)
@@ -1106,10 +1105,9 @@ func (s *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
     }
 
     if notMountPoint {
-        if err := os.RemoveAll(targetPath); err != nil {
+        if err := os.Remove(targetPath); err != nil {
             l.Infof("Remove targetPath error: %s", err.Error())
         }
-        return &csi.NodeUnpublishVolumeResponse{}, nil
     }
 
     if err := mounter.Unmount(targetPath); err != nil {
@@ -1118,10 +1116,11 @@ func (s *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
         }
     }
 
-    if err := os.RemoveAll(targetPath); err != nil && !os.IsNotExist(err) {
-        return nil, status.Errorf(codes.Internal, "Cannot remove unmounted target path '%s': %s", targetPath, err)
+    if err := os.Remove(targetPath); err != nil && !os.IsNotExist(err) {
+        l.Warnf("Failed to remove publish path %s, err %+v", targetPath, err)
     }
 
+    l.Infof("Unpublished volume %s successfully", volumeID)
     return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
